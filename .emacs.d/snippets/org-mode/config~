@@ -1,0 +1,7 @@
+# -*- mode: org -*-
+# name: config
+# binding: <f5>
+# --
+#+BEGIN_SRC emacs-lisp
+$0
+#+END_SRC

@@ -1,0 +1,2963 @@
+* package management
+** my packages
+#+BEGIN_SRC emacs-lisp
+  (require 'package)
+  (setq package-archives '(("melpa" . "https://melpa.org/packages/")
+                           ("gnu" . "https://elpa.gnu.org/packages/")))
+  (package-initialize)
+  (package-refresh-contents) ; this is only necessary when installing or updating packages (and it slows down startup significantly)
+  (defvar myPackages
+    '(
+      exec-path-from-shell
+      expand-region
+      multiple-cursors
+      ahk-mode
+      yasnippet
+      use-package
+      ivy-rich
+      counsel
+      plantuml-mode
+      bind-key
+      company
+      org-roam
+      phi-search
+      interaction-log
+      rg
+      hide-mode-line
+      imenu
+      xref
+      drag-stuff
+      )
+    )
+  (mapc #'(lambda (package)
+            (unless (package-installed-p package)
+              (package-install package)))
+        myPackages)
+#+END_SRC
+** import use-package
+#+BEGIN_SRC emacs-lisp
+  (require 'use-package)
+  (setq use-package-always-ensure t)
+#+END_SRC
+** straight setup
+#+BEGIN_SRC emacs-lisp
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
+#+END_SRC
+* system settings
+** utf8 default
+#+BEGIN_SRC emacs-lisp
+  (set-charset-priority 'unicode)
+  (prefer-coding-system 'utf-8-unix)
+  (set-default-coding-systems 'utf-8)
+#+END_SRC
+** path issues
+#+BEGIN_SRC emacs-lisp
+(exec-path-from-shell-initialize)
+#+END_SRC
+** utilities
+*** don't prompt on kill process
+#+BEGIN_SRC emacs-lisp
+  (defun set-no-process-query-on-exit ()
+    (let ((proc (get-buffer-process (current-buffer))))
+      (when (processp proc)
+        (set-process-query-on-exit-flag proc nil))))
+#+END_SRC
+*** merge plist
+#+BEGIN_SRC emacs-lisp
+  (defun plist-merge (&rest plists)
+    (if plists
+        (let ((result (copy-sequence (car plists))))
+          (while (setq plists (cdr plists))
+            (let ((plist (car plists)))
+              (while plist
+                (setq result (plist-put result (car plist) (car (cdr plist)))
+                      plist (cdr (cdr plist))))))
+          result)
+      nil))
+#+END_SRC
+** prompts
+*** yes or no -> y or p
+#+BEGIN_SRC emacs-lisp
+(fset 'yes-or-no-p 'y-or-n-p)
+#+END_SRC
+*** kill processes without confirmation
+#+BEGIN_SRC emacs-lisp
+(setq confirm-kill-processes nil)
+#+END_SRC
+** keyboard
+*** require bindkey
+#+BEGIN_SRC emacs-lisp
+(require 'bind-key)
+#+END_SRC
+*** unbind insert key
+this avoids accidentally entering overwrite mode
+#+BEGIN_SRC emacs-lisp
+  (define-key global-map [(insert)] nil)
+  (define-key global-map [(insertchar)] nil)
+#+END_SRC
+** ESUP profiler
+note: only works for GUI Emacs (and wasn't working at all the last time I tried)
+#+BEGIN_SRC emacs-lisp
+  (use-package esup
+    :defer t
+    :pin melpa
+    :commands esup)
+#+END_SRC
+* org
+** Import
+#+BEGIN_SRC emacs-lisp
+  (require 'org)
+#+END_SRC
+** latex
+#+BEGIN_SRC emacs-lisp
+  (setq org-latex-create-formula-image-program 'dvipng)
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((latex . t)))
+#+END_SRC
+** basic org configuration
+*** newlines for C-RET M-RET
+#+BEGIN_SRC emacs-lisp
+  (setq org-blank-before-new-entry (quote ((heading . nil)
+                                           (plain-list-item . nil))))
+#+END_SRC
+*** allow me to set the display of inline images to certain size
+#+BEGIN_SRC emacs-lisp
+  (setq org-image-actual-width nil)
+#+END_SRC
+**** example syntax
+#+ATTR_ORG: :width 100
+*** folded
+#+BEGIN_SRC emacs-lisp
+  (setq org-startup-folded t)
+#+END_SRC
+*** indent-mode
+#+BEGIN_SRC emacs-lisp
+  (setq org-startup-indented t)
+#+END_SRC
+*** no inline images at startup
+#+BEGIN_SRC emacs-lisp
+(setq org-startup-with-inline-images nil)
+#+END_SRC
+** don't prompt for code evaluation (specified languages)
+#+BEGIN_SRC emacs-lisp
+(setq org-confirm-babel-evaluate nil)
+#+END_SRC
+** my org functions
+*** navigate to end of subtree pre subheadings
+#+BEGIN_SRC emacs-lisp
+  (defun end-of-heading-pre-sub-headings ()
+    (interactive)
+    (end-of-line)
+    (search-forward-regexp "^\\*+ \\|\\'")
+    (beginning-of-line)
+    (backward-char))
+  (bind-key "<f6> p" 'end-of-heading-pre-sub-headings org-mode-map)
+#+END_SRC
+*** rename heading
+#+BEGIN_SRC emacs-lisp
+  (defun rename-heading ()
+    (interactive)
+    (search-forward-regexp "$")
+    (search-backward-regexp "^\\*+ ")
+    (forward-word)
+    (backward-word)
+    (setq beg (point))
+    ;; (push-mark nil t t)
+    (search-forward-regexp "$")
+    (kill-region beg (point))
+    ;; need these lines to deal with folded headings
+    (search-backward-regexp "^\\*+ ")
+    (search-forward-regexp "$")
+    )
+    (bind-key* "<f6> r" 'rename-heading)
+#+END_SRC
+*** new subheading respect content (or don't: C-u)
+would need another function for todos
+this needs to be below [[*navigate to end of subtree][navigate to end of subtree]]
+#+BEGIN_SRC emacs-lisp
+  (defun new-subheading-respect-content ()
+    (interactive)
+    (cond
+     ((equal current-prefix-arg nil)
+      (push-mark (point))
+      (org-insert-heading-respect-content)
+      (org-do-demote)
+      (when (looking-at "\n\n") (delete-forward-char 1)))
+     ((equal current-prefix-arg '(4))
+      (end-of-heading-pre-sub-headings)
+      (org-insert-heading)
+      (org-do-demote)
+      )
+     )
+    )
+  (bind-key "C-M-<return>" 'new-subheading-respect-content org-mode-map)
+#+END_SRC
+** make sure regular links still go to chrome
+#+BEGIN_SRC emacs-lisp
+(when (and (eq system-type 'gnu/linux)
+           (string-match
+            "Linux.*Microsoft.*Linux"
+            (shell-command-to-string "uname -a")))
+  (setq
+   browse-url-generic-program  "/mnt/c/Windows/System32/cmd.exe"
+   browse-url-generic-args     '("/c" "start")
+   browse-url-browser-function #'browse-url-generic))
+#+END_SRC
+
+** org links
+*** no newline after inserting stored link
+#+BEGIN_SRC emacs-lisp
+  (defun my-insert-last-stored-link ()
+    (interactive)
+    (org-insert-last-stored-link 1)
+    (when (looking-back "^") (delete-backward-char 1)))
+#+END_SRC
+*** toggle link display
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> h" 'org-toggle-link-display)
+#+END_SRC
+*** store link
+#+BEGIN_SRC emacs-lisp
+  ;; used to save the buffer in emacs, now I do it in qmk
+  ;; (defun my-org-store-link ()
+  ;;   (interactive)
+  ;;   (org-store-link)
+  ;;   (when ((string-equal (file-name-extension (buffer-file-name)) "pdf") 
+  ;;         (save-buffer))))
+  (bind-key* "<f6> i" 'org-store-link)
+#+END_SRC
+*** insert last stored link
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> j" 'my-insert-last-stored-link)
+#+END_SRC
+** org-goto
+note that C-u C-c C-j still allows access to classic interface
+#+BEGIN_SRC emacs-lisp
+  (setq org-goto-interface 'outline-path-completion)
+  (setq org-outline-path-complete-in-steps nil)
+  (bind-key* "<f6> q" 'org-goto)
+#+END_SRC
+*** worf
+I used this before I realized org-goto can be configured the way I want.
+;#+BEGIN_SRC emacs-lisp
+  (use-package worf)
+  (bind-key* "<f6> q" 'worf-goto)
+#+END_SRC
+** fontify (or don't) todo headlines
+#+BEGIN_SRC emacs-lisp
+  (with-eval-after-load 'org
+    (setq org-fontify-done-headline nil))
+#+END_SRC
+* appearances
+** diminish
+#+BEGIN_SRC emacs-lisp
+  (use-package diminish
+    :demand t)
+#+END_SRC
+** window (frame) initialization
+*** only show errors (not warnings) on startup
+#+BEGIN_SRC emacs-lisp
+(setq warning-minimum-level :emergency)
+#+END_SRC
+*** hide the toolbar
+#+BEGIN_SRC emacs-lisp
+  (tool-bar-mode -1)
+#+END_SRC
+
+*** hide the menubar
+#+BEGIN_SRC emacs-lisp
+  (menu-bar-mode -1)
+#+END_SRC
+
+*** hide the scrollbar
+#+BEGIN_SRC emacs-lisp
+  (toggle-scroll-bar -1)
+#+END_SRC
+
+**** hide the scrollbar on creating a new frame
+#+BEGIN_SRC emacs-lisp
+  (defun my-disable-scroll-bars (frame)
+    (modify-frame-parameters frame
+                             '((vertical-scroll-bars . nil)
+                               (horizontal-scroll-bars . nil))))
+  (add-hook 'after-make-frame-functions 'my-disable-scroll-bars)
+#+END_SRC
+
+*** hide the title bar
+#+BEGIN_SRC emacs-lisp
+  (setq default-frame-alist '((undecorated . t)))
+#+END_SRC
+** font
+#+BEGIN_SRC emacs-lisp
+  (setq text-scale-mode-step 1.08)
+  (set-face-attribute 'default nil :height 160)
+#+END_SRC
+*** font note
+Iosevka is a pleasant font that is popular for coding
+** theme (zenburn)
+#+BEGIN_SRC emacs-lisp
+  (use-package zenburn-theme
+    :config
+    (setq zenburn-override-colors-alist
+          '(("zenburn-bg" . "#000000")
+            ("zenburn-bg-2"  . "#102020")
+            ("zenburn-bg-1"  . "#202020") ; highlight
+            ("zenburn-bg-08"  . "#252525")
+            ("zenburn-bg-05"  . "#342828") ; hl line
+            ("zenburn-bg+05"  . "#2D2D2D")
+            ("zenburn-bg+1"  . "#303030")
+            ("zenburn-bg+2"  . "#323232")
+            ("zenburn-bg+3"  . "#353535")
+            ("zenburn-fg-1"     . "#555555")
+            ("zenburn-fg-05"    . "#888888")
+            ("zenburn-fg"     . "#DDDDDD")
+            ("zenburn-fg+1"     . "#EEEEEE")
+            ("zenburn-fg+2"     . "#FFFFFF")))
+    (load-theme 'zenburn t)
+    (set-face-background 'mode-line-inactive "#202020")
+    (set-face-background 'mode-line "#2D2D2D")
+    )
+#+END_SRC
+** modeline
+mostly so that I can enable pixel scrolling, but it also looks nice
+- pixel scrolling has issues when the modeline updates too much, and this one is efficient
+#+BEGIN_SRC emacs-lisp
+  (use-package doom-modeline
+    :demand
+    :config
+    (doom-modeline-mode 1)
+    ;; Whether display icons in the mode-line.
+    ;; While using the server mode in GUI, should set the value explicitly.
+    (setq doom-modeline-icon nil)
+    ;; How tall the mode-line should be. It's only respected in GUI.
+    ;; If the actual char height is larger, it respects the actual height.
+    (setq doom-modeline-height 1)
+    )
+#+END_SRC
+*** show column number in mode line
+#+BEGIN_SRC emacs-lisp
+(column-number-mode)
+#+END_SRC
+** rainbow delimiters
+#+BEGIN_SRC emacs-lisp
+  (use-package rainbow-delimiters
+    :hook ((prog-mode . rainbow-delimiters-mode)))
+#+END_SRC
+** no scratch buffer description
+#+BEGIN_SRC emacs-lisp
+  (setq initial-scratch-message nil)
+#+END_SRC
+** recursive minibuffers
+;#+BEGIN_SRC emacs-lisp
+(setq enable-recursive-minibuffers t)
+(minibuffer-depth-indicate-mode)
+#+END_SRC
+** toggle linum mode
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f5> d" 'linum-mode)
+#+END_SRC
+** toggle truncate lines
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f5> e" 'toggle-truncate-lines)
+#+END_SRC
+** highlight error messages more aggresively
+#+BEGIN_SRC emacs-lisp
+(setq next-error-message-highlight t)
+#+END_SRC
+** highlight current line (hl-line-mode)
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'prog-mode-hook #'hl-line-mode)
+  (add-hook 'text-mode-hook #'hl-line-mode)
+  (add-hook 'dired-after-readin-hook #'hl-line-mode)
+  
+#+END_SRC
+** beacon
+#+BEGIN_SRC emacs-lisp
+  (use-package beacon
+    :diminish
+    :config
+    (beacon-mode 1)
+    (bind-key* "<f5> 8" 'beacon-blink)
+    )
+#+END_SRC
+** indent highlight indication
+#+BEGIN_SRC emacs-lisp
+  (use-package highlight-indent-guides
+    :defer
+    :init
+    (add-hook 'prog-mode-hook 'highlight-indent-guides-mode)
+    (setq highlight-indent-guides-method 'column)
+    (setq highlight-indent-guides-responsive 'top)
+    (setq highlight-indent-guides-auto-enabled nil)
+    (setq highlight-indent-guides-delay 0.1)
+  ; :config
+  ;  (set-face-background 'highlight-indent-guides-odd-face "#102020")
+  ;  (set-face-background 'highlight-indent-guides-top-odd-face "#342828")
+  ;  (set-face-background 'highlight-indent-guides-even-face "#102020")
+  ;  (set-face-background 'highlight-indent-guides-top-even-face "#342828")
+    )
+#+END_SRC
+** ivy-posframe
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy-posframe
+    :after ivy
+    :demand t
+    :config
+    (setq ivy-posframe-display-functions-alist '((t . ivy-posframe-display-at-frame-center)))
+    (ivy-posframe-mode 1)
+    )
+#+END_SRC
+** visual line mode (word wrapping)
+#+BEGIN_SRC emacs-lisp
+(add-hook 'text-mode-hook (lambda () (visual-line-mode)))
+#+END_SRC
+** default to not truncating lines in minibuffer
+#+BEGIN_SRC emacs-lisp
+(add-hook 'minibuffer-setup-hook
+      (lambda () (setq truncate-lines nil)))
+#+END_SRC
+* text editing
+** duplicate line or region
+taken from tuxicity
+https://rejeep.github.io/emacs/elisp/2010/03/11/duplicate-current-line-or-region-in-emacs.html
+note that M-NumDuplicate or C-u NumDuplicate is the way to prefix multiple
+#+BEGIN_SRC emacs-lisp
+  (defun duplicate-current-line-or-region (arg)
+    "Duplicates the current line or region ARG times.
+  If there's no region, the current line will be duplicated. However, if
+  there's a region, all lines that region covers will be duplicated."
+    (interactive "p")
+    (let (beg end (origin (point)))
+      (if (and mark-active (> (point) (mark)))
+          (exchange-point-and-mark))
+      (setq beg (line-beginning-position))
+      (if mark-active
+          (exchange-point-and-mark))
+      (setq end (line-end-position))
+      (let ((region (buffer-substring-no-properties beg end)))
+        (dotimes (i arg)
+          (goto-char end)
+          (newline)
+          (insert region)
+          (setq end (point)))
+        (goto-char (+ origin (* (length region) arg) arg)))))
+  (bind-key* "C-d" 'duplicate-current-line-or-region)
+#+END_SRC
+** indentation
+*** spaces no tabs
+#+BEGIN_SRC emacs-lisp
+  (setq-default indent-tabs-mode nil)
+#+END_SRC
+*** 4 spaces
+#+BEGIN_SRC emacs-lisp
+  (setq tab-width 4)
+  (setq-default tab-width 4)
+  (setq indent-line-function 'insert-tab)
+  (setq-default c-basic-offset 4)
+  (setq tab-stop-list '(4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80))
+#+END_SRC
+*** aggresive indent
+#+BEGIN_SRC emacs-lisp
+  (use-package aggressive-indent
+    :diminish
+    :hook (emacs-lisp-mode . aggressive-indent-mode))
+#+END_SRC
+** drag stuff
+defined at startup because it's used in all modes
+*** bindings to be overwritten by other modes
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "M-<up>")   #'drag-stuff-up)
+  (global-set-key (kbd "M-<down>") #'drag-stuff-down)
+  (global-set-key (kbd "M-<right>") #'drag-stuff-right)
+  (global-set-key (kbd "M-<left>") #'drag-stuff-left)
+#+END_SRC
+*** bindings that won't be overwritten
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> x" 'drag-stuff-up) ; lpl+"n"
+  (bind-key* "<f6> y" 'drag-stuff-down) ; lpl+"p"
+#+END_SRC
+** my-delete-all-lines-in-region
+different than the built-in in that it deletes the newline before the killed line instead of after
+- also I think you have to click built-in twice
+#+BEGIN_SRC emacs-lisp
+  ;; (defun my-kill-whole-line (append)
+  ;;   (interactive)
+  ;;   (setq tog-sh-tr-wh nil)
+  ;;   (setq line (line-number-at-pos))
+  ;;   (setq tot-lines-pre-kill (count-lines (point-min) (point-max)))
+  ;;   (if (< 1 line)
+  ;;       (progn
+  ;;         (previous-line)
+  ;;         (move-end-of-line nil))
+  ;;     (progn
+  ;;       (move-beginning-of-line nil)
+  ;;       (with-temp-buffer
+  ;;         (insert "\n")
+  ;;         (kill-region (point-min) (point-max))))
+  ;;     )
+  ;;   (kill-line)
+  ;;   (unless (or
+  ;;            (and
+  ;;             (< (count-lines (point-min) (point-max)) tot-lines-pre-kill)
+  ;;             (bobp)
+  ;;             ;; (looking-at "\n")
+  ;;             )
+  ;;            (and (not (bobp))(eolp))
+  ;;            (eobp))
+  ;;     (progn
+  ;;       (if (not show-trailing-whitespace)
+  ;;           (progn
+  ;;             (setq show-trailing-whitespace t)
+  ;;             (setq tog-sh-tr-wh t)))
+  ;;       (if (and (bobp) (eolp))
+  ;;           (delete-char 1)
+  ;;         (progn
+  ;;           (append-next-kill)
+  ;;           (kill-line)
+  ;;           ))
+  ;;       (if tog-sh-tr-wh
+  ;;           (setq show-trailing-whitespace nil))))
+  ;;   )
+
+  ;; (defun my-delete-all-lines-in-region ()
+  ;;   (interactive)
+  ;;   (setq swap-p-m nil)
+  ;;   (setq beg (line-beginning-position))
+  ;;   (setq end (line-end-position))
+  ;;   (setq num-lines 1)
+  ;;   (if mark-active
+  ;;       (progn
+  ;;         (setq trunc-swap nil)
+  ;;         (if (not truncate-lines)
+  ;;             (progn
+  ;;               (toggle-truncate-lines)
+  ;;               (setq trunc-swap t)))
+  ;;         (if (> (point) (mark))
+  ;;             (progn
+  ;;               (setq swap-p-m t)
+  ;;               (exchange-point-and-mark)))
+  ;;         (setq beg (line-beginning-position))
+  ;;         (if mark-active
+  ;;             (exchange-point-and-mark))
+  ;;         (setq end (line-end-position))
+  ;;         (unless swap-p-m
+  ;;           (exchange-point-and-mark))
+  ;;         (setq num-lines (count-lines beg end))
+
+  ;;         (if (< (point) (mark))
+  ;;             (exchange-point-and-mark))
+  ;;         (if (and (bolp) (or (eobp) (eolp)))
+  ;;             (setq num-lines (1+ num-lines)))
+  ;;         (dotimes (i num-lines)
+  ;;           (if (> i 0)
+  ;;               (my-kill-whole-line t)
+  ;;             (my-kill-whole-line nil)))
+  ;;         (if trunc-swap
+  ;;             (toggle-truncate-lines))
+  ;;         )
+  ;;     (my-kill-whole-line nil)
+  ;;     )
+  ;;   )
+
+  ;; (defun my-kill-or-copy-all-lines-in-region ()
+  ;;   (interactive)
+  ;;   (my-delete-all-lines-in-region)
+  ;;   (with-temp-buffer
+  ;;     (insert (car kill-ring))
+  ;;     (beginning-of-buffer)
+  ;;     (if (looking-at "\n")
+  ;;         (delete-char 1))
+  ;;     (reverse-region (point-min) (point-max))
+  ;;     (kill-new "\n" t)
+  ;;     (kill-region (point-min) (point-max))))
+
+  (defun my-kill-or-copy-all-lines-in-region (kill)
+    (interactive)
+    (let (tr-wh-is-swap trunc-is-swap end (origin (point)))
+      (if (not truncate-lines)
+          (progn
+            (toggle-truncate-lines)
+            (setq trunc-is-swap t)))
+      (if (not show-trailing-whitespace)
+          (progn
+            (setq show-trailing-whitespace t)
+            (setq tr-wh-is-swap t)))
+      (if mark-active
+          (if (< (point) (mark))
+              (exchange-point-and-mark)))
+      (setq end (line-end-position))
+      (if mark-active
+          (exchange-point-and-mark))
+      (move-beginning-of-line nil)
+      (kill-new "\n" t)
+      (append-next-kill)
+      (if kill
+          (progn
+            (kill-region (point) end)
+            (if (< 1 (line-number-at-pos (point)))
+                (delete-char -1)
+              (if (not (eobp))
+                  (delete-char 1))))
+        (copy-region-as-kill (point) end))
+      (if tr-wh-is-swap
+          (setq show-trailing-whitespace nil))
+      (if trunc-is-swap
+          (toggle-truncate-lines))))
+
+  (defun my-kill-all-lines-in-region ()
+    (interactive)
+    (my-kill-or-copy-all-lines-in-region t))
+
+  (defun my-copy-all-lines-in-region ()
+    (interactive)
+    (my-kill-or-copy-all-lines-in-region nil))
+
+  (bind-key* "C-k" 'my-kill-all-lines-in-region)
+  (bind-key* "M-k" 'my-copy-all-lines-in-region)
+#+END_SRC
+*** test my-delete-all-lines-in-region
+#+NAME: test-my-kill-or-copy-all-lines-in-region
+#+BEGIN_SRC emacs-lisp :tangle no
+  (ert-deftest delete-single-line-with-active-region ()
+    (with-temp-buffer
+      (insert "t1\nt4t5\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (forward-char)
+      (push-mark (point) nil t)
+      (forward-char)
+      (forward-char)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\nt2"))))
+
+  (ert-deftest delete-2-4-with-empty-1-5 ()
+    (with-temp-buffer
+      (insert "\n\n\n\n")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3\n"))))
+
+  (ert-deftest delete-2-4-with-empty-2 ()
+    (with-temp-buffer
+      (insert "t1\n\nt5\nt4\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\nt2"))))
+
+  (ert-deftest delete-2-4-with-empty-4 ()
+    (with-temp-buffer
+      (insert "t1\nt4\nt5\n\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\nt2"))))
+
+  (ert-deftest delete-2-4-with-empty-3 ()
+    (with-temp-buffer
+      (insert "t1\nt4\n\nt5\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\nt2"))))
+
+  (ert-deftest delete-3-with-empty-2-4 ()
+    (with-temp-buffer
+      (insert "t1\n\nt4\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\n\nt2"))))
+
+  (ert-deftest delete-empty-3-with-empty-2-4 ()
+    (with-temp-buffer
+      (insert "t1\n\n\nt2")
+      (beginning-of-buffer)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\n\nt2"))))
+
+  (ert-deftest delete-last-with-empty-previous ()
+    (with-temp-buffer
+      (insert "t1\n\nt2")
+      (end-of-buffer)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t1\n"))))
+
+  (ert-deftest delete-1-with-text-2 ()
+    (with-temp-buffer
+      (insert "t1\nt2")
+      (beginning-of-buffer)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3t2"))))
+
+  (ert-deftest delete-1-with-empty-2 ()
+    (with-temp-buffer
+      (insert "t1\n")
+      (beginning-of-buffer)
+      (my-delete-all-lines-in-region)
+      (kill-new "t3" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t3"))))
+
+  (ert-deftest delete-empty-2 ()
+    (with-temp-buffer
+      (insert "t1\n\nt3")
+      (beginning-of-buffer)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t4" t)
+      (kill-region (point-min) (point-max))
+      (should (string= (car kill-ring) "t4t1\nt3"))))
+
+  (ert-deftest delete-empty-3-with-empty-2 ()
+    (with-temp-buffer
+      (insert "t1\n\n\nt3")
+      (beginning-of-buffer)
+      (forward-line)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t4" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t4t1\n\nt3"))))
+
+  (ert-deftest delete-empty-2-with-empty-3 ()
+    (with-temp-buffer
+      (insert "t1\n\n\nt3")
+      (beginning-of-buffer)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t4" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t4t1\n\nt3"))))
+
+  (ert-deftest delete-2 ()
+    (with-temp-buffer
+      (insert "t1\nt2\nt3")
+      (beginning-of-buffer)
+      (forward-line)
+      (my-delete-all-lines-in-region)
+      (kill-new "t4" t)
+      (mark-whole-buffer)
+      (append-next-kill)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t4t1\nt3"))))
+
+  (ert-deftest delete-empty-1-with-text-2 ()
+    (find-file "test1.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "\nt1")
+    (beginning-of-buffer)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t1")))
+
+  (ert-deftest delete-empty-1-with-empty-2 ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "\n\n")
+    (beginning-of-buffer)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3\n")))
+
+  (ert-deftest delete-only-1-3-with-empty-1-3 ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "\nt1\n")
+    (beginning-of-buffer)
+    (push-mark (point) nil t)
+    (forward-line)
+    (forward-line)
+    (my-delete-all-lines-in-region)
+    (setq test (car kill-ring))
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) test)))
+
+  (ert-deftest delete-2-4-with-empty-2-4 ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "t2\n\nt4\n\nt1")
+    (beginning-of-buffer)
+    (forward-line)
+    (push-mark (point) t t)
+    (forward-line)
+    (forward-line)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t2\nt1")))
+
+  (ert-deftest delete-2-4-with-empty-2-4-reverse ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "t2\n\nt4\n\nt1")
+    (beginning-of-buffer)
+    (forward-line)
+    (forward-line)
+    (forward-line)
+    (push-mark (point) t t)
+    (previous-line)
+    (previous-line)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t2\nt1")))
+
+  (ert-deftest delete-2-4 ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "t2\nt5\nt4\nt6\nt1")
+    (beginning-of-buffer)
+    (forward-line)
+    (push-mark (point) t t)
+    (forward-line)
+    (forward-line)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t2\nt1")))
+
+  (ert-deftest delete-2-4-reverse ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "t2\nt5\nt4\nt6\nt1")
+    (beginning-of-buffer)
+    (forward-line)
+    (forward-line)
+    (forward-line)
+    (push-mark (point) t t)
+    (previous-line)
+    (previous-line)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t2\nt1")))
+
+  (ert-deftest delete-empty-last-with-text-previous ()
+    (find-file "test.txt")
+    (mark-whole-buffer)
+    (kill-region (point) (mark))
+    (insert "t1\n\n")
+    (beginning-of-buffer)
+    (forward-line)
+    (forward-line)
+    (push-mark (point) t t)
+    (my-delete-all-lines-in-region)
+    (kill-new "t3" t)
+    (mark-whole-buffer)
+    (append-next-kill)
+    (kill-region (point) (mark))
+    (set-buffer-modified-p nil)
+    (kill-this-buffer)
+    (should (string= (car kill-ring) "t3t1\n")))
+
+                                          ; add a test for kill a region or line and then adding another immediately (it should prepend)
+  (ert-deftest kill-1-2 ()
+    (with-temp-buffer
+      ;; (with-current-buffer (get-buffer-create "debug-buffer")
+      ;;   (view-buffer-other-window (current-buffer))
+      (insert "t1\nt2\nt3\nt4")
+      (beginning-of-buffer)
+      (push-mark (point) nil t)
+      (forward-line)
+      (my-kill-or-copy-all-lines-in-region)
+      (with-temp-buffer
+        (insert (car kill-ring))
+        (kill-new "t5" t)
+        (kill-region (point-min) (point-max)))
+      (should (string= (car kill-ring) "t5\nt1\nt2"))))
+
+  (ert-deftest kill-2-3-with-empty-1 ()
+    (with-temp-buffer
+      (insert "\nt2\nt3\nt4")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (my-kill-or-copy-all-lines-in-region)
+      (kill-new "t5" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t5\nt4"))))
+
+  (ert-deftest kill-2-3-with-empty-1-2 ()
+    (with-temp-buffer
+      (insert "\n\nt3\nt4")
+      (beginning-of-buffer)
+      (forward-line)
+      (push-mark (point) nil t)
+      (forward-line)
+      (my-kill-or-copy-all-lines-in-region)
+      (kill-new "t5" t)
+      (append-next-kill)
+      (mark-whole-buffer)
+      (kill-region (point) (mark))
+      (should (string= (car kill-ring) "t5\nt4"))))
+#+END_SRC
+*** testplan
+**** kill-line
+**** copy-line
+**** kill-2-4
+**** kill-2-4-reverse
+**** copy-2-4
+**** copy-2-4-reverse
+**** killing a few lines one at a time can then be yanked correctly
+** commenting
+found this on stack overflow
+name based on functionality being like eclipse
+#+BEGIN_SRC emacs-lisp
+  (defun comment-eclipse ()
+    (interactive)
+    (let ((start (line-beginning-position))
+          (end (line-end-position)))
+      (when (or (not transient-mark-mode) (region-active-p))
+        (setq start (save-excursion
+                      (goto-char (region-beginning))
+                      (beginning-of-line)
+                      (point))
+              end (save-excursion
+                    (goto-char (region-end))
+                    (end-of-line)
+                    (point))))
+      (comment-or-uncomment-region start end)))
+  (bind-key* (kbd "M-;") 'comment-eclipse)
+#+END_SRC
+** multiple cursors
+*** lists of commands to run once/for all
+this needs to be run before requiring multiple cursors
+#+BEGIN_SRC emacs-lisp
+  (setq mc/list-file "~/.emacs.d/.mc-lists.el")
+#+END_SRC
+*** setup
+#+BEGIN_SRC emacs-lisp
+  (require 'multiple-cursors)
+#+END_SRC
+*** original hotkeys
+;#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C->") 'mc/mark-next-like-this)
+  (global-set-key (kbd "C-<") 'mc/mark-previous-like-this)
+  (global-set-key (kbd "C-c C-<") 'mc/mark-all-like-this)
+#+END_SRC
+*** hotkeys
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> k" 'mc/mark-next-like-this)
+  (bind-key* "<f6> l" 'mc/mark-previous-like-this)
+  (bind-key* "<f6> m" 'mc/mark-all-like-this)
+  (bind-key* "<f6> n" 'mc/unmark-next-like-this)
+  (bind-key* "<f6> o" 'mc/unmark-previous-like-this)
+  (bind-key* "<mouse-8>" 'mc/add-cursor-on-click) ;; qmk btn4 reads as 8
+#+END_SRC
+** expand region
+#+BEGIN_SRC emacs-lisp
+  (use-package expand-region
+    :defer 3
+    :config
+    (defun my-mark-symbol ()
+      (interactive)
+      (push-mark)
+      (er/mark-symbol))
+    (defun my-mark-word ()
+      (interactive)
+      (push-mark)
+      (er/mark-word))
+    (defun my-mark-inside-quotes ()
+      (interactive)
+      (push-mark)
+      (er/mark-inside-quotes))
+    (defun my-mark-outside-quotes ()
+      (interactive)
+      (push-mark)
+      (er/mark-outside-quotes))
+    (defun my-mark-outside-pairs ()
+      (interactive)
+      (push-mark)
+      (er/mark-outside-pairs))
+    (defun my-mark-inside-pairs ()
+      (interactive)
+      (push-mark)
+      (er/mark-inside-pairs))
+    (bind-key* "C-=" 'er/expand-region)
+    (bind-key* "<f5> t" 'my-mark-symbol)
+    (bind-key* "<f5> u" 'my-mark-word)
+    (bind-key* "<f5> y" 'my-mark-inside-quotes)
+    (bind-key* "<f5> x" 'my-mark-outside-quotes)
+    (bind-key* "<f5> 5" 'my-mark-outside-pairs)
+    (bind-key* "<f5> 6" 'my-mark-inside-pairs)
+    )
+#+END_SRC
+** electric pair mode
+#+BEGIN_SRC emacs-lisp
+(electric-pair-mode)
+#+END_SRC
+** shift by indentation
+#+BEGIN_SRC emacs-lisp
+  (defun my-indent-shift-left ()
+    (interactive
+     (progn
+       (if mark-active
+           (if (> (point) (mark))
+               (exchange-point-and-mark)))
+       (let ((deactivate-mark nil))
+         (if mark-active
+             (indent-rigidly (line-beginning-position) (region-end) (- 4))
+           (indent-rigidly (line-beginning-position) (line-end-position) (- 4)))))
+     )
+    )
+
+  (defun my-indent-shift-right ()
+    (interactive
+     (progn
+       (if mark-active
+           (if (> (point) (mark))
+               (exchange-point-and-mark)))
+       (let ((deactivate-mark nil))
+         (if mark-active
+             (indent-rigidly (line-beginning-position) (region-end) 4)
+           (indent-rigidly (line-beginning-position) (line-end-position) 4))))
+     )
+    )
+
+  (bind-key* "<f5> n" 'my-indent-shift-right)
+  (bind-key* "<f5> o" 'my-indent-shift-left)
+#+END_SRC
+*** TODO note that I fixed the exchange-point and mark issue
+** TODO forward/backward kill/delete word
+#+BEGIN_SRC emacs-lisp
+  (global-unset-key (kbd "C-<backspace>"))
+  (global-unset-key (kbd "C-<delete>"))
+  (bind-key* "M-<delete>" 'kill-word)
+#+END_SRC
+* completion
+
+** ivy
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy
+    :demand t
+    :config
+    (setq ivy-re-builders-alist
+          '((t . ivy--regex-fuzzy)))
+    (setq ivy-use-virtual-buffers t)
+    (setq ivy-count-format "(%d/%d) ")
+    (setq ivy-height 15)
+    (setq ivy-display-style 'fancy)
+    (defun my-swiper ()
+      (interactive)
+      (setq search-invisible t)
+      (swiper)
+      (setq search-invisible nil)
+      )
+    (bind-key* "<f6> z" 'my-swiper)
+    (bind-key* "<f5> s" 'counsel-imenu)
+    (bind-key* "M-x" 'counsel-M-x)
+    (bind-key* "C-x C-f" 'counsel-find-file)
+
+    (ivy-mode))
+#+END_SRC
+*** ivy rich
+a lot of this is dealing with some performance issues associated with ivy rich
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy-rich
+    :after all-the-icons-ivy-rich
+    :config
+    (ivy-rich-mode 1)
+    (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-line)
+    (ivy-rich-project-root-cache-mode)
+    (eval-after-load 'ivy-rich
+      (progn
+        (defvar ek/ivy-rich-cache
+          (make-hash-table :test 'equal))
+
+        (defun ek/ivy-rich-cache-lookup (delegate candidate)
+          (let ((result (gethash candidate ek/ivy-rich-cache)))
+            (unless result
+              (setq result (funcall delegate candidate))
+              (puthash candidate result ek/ivy-rich-cache))
+            result))
+
+        (defun ek/ivy-rich-cache-reset ()
+          (clrhash ek/ivy-rich-cache))
+
+        (defun ek/ivy-rich-cache-rebuild ()
+          (mapc (lambda (buffer)
+                  (ivy-rich--ivy-switch-buffer-transformer (buffer-name buffer)))
+                (buffer-list)))
+
+        (defun ek/ivy-rich-cache-rebuild-trigger ()
+          (ek/ivy-rich-cache-reset)
+          (run-with-idle-timer 1 nil 'ek/ivy-rich-cache-rebuild))
+
+        (advice-add 'ivy-rich--ivy-switch-buffer-transformer :around 'ek/ivy-rich-cache-lookup)
+        (advice-add 'ivy-switch-buffer :after 'ek/ivy-rich-cache-rebuild-trigger)))
+
+    )
+#+END_SRC
+** company
+#+BEGIN_SRC emacs-lisp
+  (use-package company
+    :defer t
+    :hook
+    (prog-mode . company-mode)
+    (text-mode . company-mode)
+    :bind
+    (:map company-active-map
+          ("<tab>" . company-complete-common))
+    :custom
+    (company-require-match nil)
+    (company-idle-delay 0)
+    (company-echo-delay 0) ; performance issue?
+    (company-dabbrev-code-time-limit nil) ; performance issue?
+    :config
+    (defun my-company-prog-hook ()
+      (setq-local company-backends '((company-dabbrev-code company-files))))
+    (add-hook 'prog-mode-hook #'my-company-prog-hook)
+    (defun my-company-text-hook ()
+      (setq-local company-backends '((company-files))))
+    (add-hook 'text-mode-hook #'my-company-text-hook)
+    )
+#+END_SRC
+*** company with lsp (old)
+;#+BEGIN_SRC emacs-lisp
+(use-package company
+  :defer t
+  :after lsp-mode
+  :hook
+  (lsp-mode . company-mode)
+  :bind
+  (:map company-active-map
+        ("<tab>" . company-complete-selection))
+  (:map lsp-mode-map
+        ("<tab>" . company-indent-or-complete-common))
+  :custom
+  ;; (company-minimum-prefix-length 0)
+  (company-idle-delay 0.1)
+  :config
+  (setq lsp-completion-provider :capf))
+
+(use-package company-box
+  :defer t
+  :hook (company-mode . company-box-mode))
+
+(use-package company-posframe
+  :after company
+  :init (company-posframe-mode 1)
+  :diminish)
+
+(use-package company-irony
+  :after company
+  :config
+  (add-to-list 'company-backends 'company-irony))
+
+
+#+END_SRC
+** flx
+#+BEGIN_SRC emacs-lisp
+(use-package flx)
+#+END_SRC
+** old hippie-expand
+;#+BEGIN_SRC emacs-lisp
+  (use-package hippie-completing-read
+    :straight (hippie-completing-read :type git :host github :repo "duckwork/hippie-completing-read"
+                                      :fork (:host github :repo "nathanvercaemert/hippie-completing-read"))
+    :init
+    (bind-key* "M-/" 'hippie-completing-read)
+    )
+#+END_SRC
+
+
+** old helm
+I think this needs to be above org
+;#+BEGIN_SRC emacs-lisp
+  (use-package helm
+    :demand t)
+  (use-package helm-flx
+    :after helm
+    :config
+    (helm-flx-mode +1))
+#+END_SRC
+** old ido
+;#+BEGIN_SRC emacs-lisp
+  (require 'ido)
+  (ido-mode t)
+  (setq ido-enable-flex-matching t)
+  #+END_SRC
+
+* selection and clipboard
+[[*navigation][navigation]] (for paragraphs
+** delete highlighted text
+#+BEGIN_SRC emacs-lisp
+  (delete-selection-mode 1)
+#+END_SRC
+** shift selection
+*** shift selection mode
+#+BEGIN_SRC emacs-lisp
+(setq shift-select-mode t)
+#+END_SRC
+
+*** mouse issue
+without this it opens a menu when you S-mouse1
+#+BEGIN_SRC emacs-lisp
+  (define-key global-map (kbd "<S-down-mouse-1>") 'mouse-save-then-kill)
+#+END_SRC
+** pasting from outside emacs
+#+BEGIN_SRC emacs-lisp
+(setq save-interprogram-paste-before-kill t)
+#+END_SRC
+** selecting/marking sentences
+shouldn't need this but it doesn't always want to work (c-mode for example)
+;#+BEGIN_SRC emacs-lisp
+  (defun mark-sentence-forward-helper ()
+    (interactive)
+    (push-mark (point))
+    (activate-mark)
+    (forward-sentence))
+  (defun mark-sentence-forward ()
+    (interactive)
+    (if mark-active
+        (forward-sentence)
+      (mark-sentence-forward-helper)))
+  (bind-key* "M-E" 'mark-sentence-forward)
+  (defun mark-sentence-backward-helper ()
+    (interactive)
+    (push-mark (point))
+    (activate-mark)
+    (backward-sentence))
+  (defun mark-sentence-backward ()
+    (interactive)
+    (if mark-active
+        (backward-sentence)
+      (mark-sentence-backward-helper)))
+  (bind-key* "M-A" 'mark-sentence-backward)
+#+END_SRC
+
+** xah open file in external application
+had to run
+xdg-mime default org.pwmt.zathura.desktop application/pdf
+to make sure zathura opened pdfs
+this is stored in ~/.config/something-something-mimetypes
+#+BEGIN_SRC emacs-lisp
+(defun xah-open-in-external-app (&optional @fname)
+  "Open the current file or dired marked files in external app.
+When called in emacs lisp, if @fname is given, open that.
+URL `http://xahlee.info/emacs/emacs/emacs_dired_open_file_in_ext_apps.html'
+Version 2019-11-04 2021-02-16"
+  (interactive)
+  (let* (
+         ($file-list
+          (if @fname
+              (progn (list @fname))
+            (if (string-equal major-mode "dired-mode")
+                (dired-get-marked-files)
+              (list (buffer-file-name)))))
+         ($do-it-p (if (<= (length $file-list) 5)
+                       t
+                     (y-or-n-p "Open more than 5 files? "))))
+    (when $do-it-p
+      (cond
+       ((string-equal system-type "windows-nt")
+        (mapc
+         (lambda ($fpath)
+           (shell-command (concat "PowerShell -Command \"Invoke-Item -LiteralPath\" " "'" (shell-quote-argument (expand-file-name $fpath )) "'")))
+         $file-list))
+       ((string-equal system-type "darwin")
+        (mapc
+         (lambda ($fpath)
+           (shell-command
+            (concat "open " (shell-quote-argument $fpath))))  $file-list))
+       ((string-equal system-type "gnu/linux")
+        (mapc
+         (lambda ($fpath) (let ((process-connection-type nil))
+                            (start-process "" nil "xdg-open" $fpath))) $file-list))))))
+#+END_SRC
+* yasnippet
+** setup
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'load-path "~/.emacs.d/elpa/yasnippet-0.14.0")
+  (require 'yasnippet)
+  (yas-global-mode 1)
+#+END_SRC
+** expand snippets custom binding
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> s" 'yas-expand)
+  (bind-key* "ESC ESC <f5>" 'yas-expand)
+#+END_SRC
+** remove tab binding
+#+BEGIN_SRC emacs-lisp 
+  (define-key yas-minor-mode-map [(tab)] nil)
+  (define-key yas-minor-mode-map (kbd "TAB") nil)
+#+END_SRC
+* syntax
+** sentences have one space after period
+#+BEGIN_SRC emacs-lisp
+(setq sentence-end-double-space nil)
+#+END_SRC
+
+* navigation
+** scrolling
+*** vertical scroll step
+#+BEGIN_SRC emacs-lisp
+  (setq mouse-wheel-scroll-amount '(1 ((shift) . 1)))
+#+END_SRC
+*** horizontal scrolling
+#+BEGIN_SRC emacs-lisp
+(defvar hStep 4)
+(global-set-key (kbd "<mouse-7>") '(lambda ()
+                                     (interactive)
+                                     (scroll-left hStep)))
+(global-set-key (kbd "<mouse-6>") '(lambda ()
+                                     (interactive)
+                                     (scroll-right hStep)))
+#+END_SRC
+*** disable notification about horizonal scrolling
+#+BEGIN_SRC emacs-lisp
+(put 'scroll-left 'disabled nil)
+#+END_SRC
+*** progressive scroll nil
+#+BEGIN_SRC emacs-lisp
+(setq mouse-wheel-progressive-speed nil)
+#+END_SRC
+*** pixel scrolling
+#+BEGIN_SRC emacs-lisp
+(setq pixel-dead-time 0)
+(setq pixel-resolution-fine-flag t)
+#+END_SRC
+*** preserve screen position
+#+BEGIN_SRC emacs-lisp
+(setq scroll-preserve-screen-position 'always)
+#+END_SRC
+*** good-scroll-mode
+#+BEGIN_SRC emacs-lisp
+  (straight-use-package 'good-scroll)
+  (good-scroll-mode 1)
+#+END_SRC
+*** half page scroll
+these are from view.el in master
+#+BEGIN_SRC emacs-lisp
+  (autoload 'View-scroll-half-page-forward "view")
+  (autoload 'View-scroll-half-page-backward "view")
+  (autoload 'View-scroll-line-forward "view")
+  (autoload 'View-scroll-line-backward "view")
+  (global-set-key (kbd "<next>") 'View-scroll-half-page-forward)
+  (global-set-key (kbd "<prior>") 'View-scroll-half-page-backward)
+  (global-set-key (kbd "<f5> w") 'View-scroll-line-forward)
+  (global-set-key (kbd "<f5> v") 'View-scroll-line-backward)
+#+END_SRC
+** better buffer selection
+;#+BEGIN_SRC emacs-lisp
+  (setq ibuffer-display-summary nil)
+  (global-set-key (kbd "C-x C-b") 'ibuffer)
+  (defadvice ibuffer-update-title-and-summary (after remove-column-titles)
+     (save-excursion
+        (set-buffer "*Ibuffer*")
+        (toggle-read-only 0)
+        (goto-char 1)
+        (search-forward "-\n" nil t)
+        (delete-region 1 (point))
+        (let ((window-min-height 1))
+          ;; save a little screen estate
+          (shrink-window-if-larger-than-buffer))
+        (toggle-read-only)))
+  (ad-activate 'ibuffer-update-title-and-summary)
+#+END_SRC
+** expected isearch functionality (deprecated)
+have the next command execute at the beginning of the match
+;#+BEGIN_SRC emacs-lisp
+  (add-hook 'isearch-mode-end-hook
+            #'endless/goto-match-beginning)
+  (defun endless/goto-match-beginning ()
+    "Go to the start of current isearch match.
+  Use in `isearch-mode-end-hook'."
+    (when (and isearch-forward
+               (number-or-marker-p isearch-other-end)
+               (not mark-active)
+               (not isearch-mode-end-hook-quit))
+      (goto-char isearch-other-end)))
+#+END_SRC
+
+#+RESULTS:
+: endless/goto-match-beginning
+
+** switch to/from minibuffer
+#+BEGIN_SRC emacs-lisp
+  (defun switch-to-minibuffer-window ()
+    "switch to minibuffer window (if active)"
+    (interactive)
+    (when (active-minibuffer-window)
+      (select-frame-set-input-focus (window-frame (active-minibuffer-window)))
+      (select-window (active-minibuffer-window))))
+  (bind-key* (kbd "C-M-<end>") 'switch-to-minibuffer-window)
+  (bind-key* (kbd "C-M-<home>") 'other-window)
+#+END_SRC
+** other window
+[[*switch to/from minibuffer][switch to/from minibuffer]]
+** paragraph motion and shift selection
+#+BEGIN_SRC emacs-lisp
+  (defun backward-paragraph-with-shift-select ()
+    (interactive)
+    (setq this-command-keys-shift-translated t)
+    (call-interactively 'backward-paragraph))
+
+  (defun forward-paragraph-with-shift-select ()
+    (interactive)
+    (setq this-command-keys-shift-translated t)
+    (call-interactively 'forward-paragraph))
+
+  (bind-key* "<f5> 3" 'forward-paragraph)
+  (bind-key* "S-<f5> #" 'forward-paragraph-with-shift-select)
+  (bind-key* "<f5> 2" 'backward-paragraph)
+  (bind-key* "S-<f5> @" 'backward-paragraph-with-shift-select)
+#+END_SRC
+
+*** paragraph C-M-a C-M-e
+;#+BEGIN_SRC emacs-lisp
+(bind-key* "C-M-b" 'backward-paragraph)
+(bind-key* "C-M-f" 'forward-paragraph)
+#+END_SRC
+
+** sentences
+this should be default...
+;#+BEGIN_SRC emacs-lisp
+(bind-key* "M-a" 'backward-sentence)
+(bind-key* "M-e" 'forward-sentence)
+#+END_SRC
+
+** disable basic arrow movement
+#+BEGIN_SRC emacs-lisp
+(global-unset-key (kbd "<left>"))
+(global-unset-key (kbd "<right>"))
+(global-unset-key (kbd "<up>"))
+(global-unset-key (kbd "<down>"))
+#+END_SRC
+** TODO avy
+#+BEGIN_SRC emacs-lisp
+  (setq search-invisible nil)
+
+  (setq org-tags-column    0)
+
+  (use-package avy
+    :custom
+    (avy-all-windows nil)
+    :config
+    (setq avy-timeout-seconds 100
+          )
+    :custom-face
+    (avy-goto-char-timer-face ((t (:background "white" :foreground "black" :weight bold :underline "red" :weight bold))))
+    ;; :config
+    ;;  ;; this makes matches closer to point have shorter avy-sequences
+    ;; (setq avy-orders-alist
+    ;;       '((avy-goto-char . avy-order-closest)
+    ;;         (avy-goto-word-0 . avy-order-closest)))
+    )
+  (bind-key* "<f5> 1" 'avy-goto-char-timer)
+#+END_SRC
+
+** mark ring 
+*** is mark at point
+#+BEGIN_SRC emacs-lisp
+(defun marker-is-point-p (marker)
+  "test if marker is current point"
+  (and (eq (marker-buffer marker) (current-buffer))
+       (= (marker-position marker) (point))))
+#+END_SRC
+*** local push mark maybe
+#+BEGIN_SRC emacs-lisp
+  (defun push-local-mark-maybe () 
+    "push mark onto `local-mark-ring' if mark head or tail is not current location"
+    (if (not mark-ring) (error "local-mark-ring empty")
+      (unless (or (marker-is-point-p (car mark-ring))
+                  (marker-is-point-p (car (reverse mark-ring))))
+        (push-mark)
+        (pop-to-mark-command))))
+#+END_SRC
+*** local back mark
+#+BEGIN_SRC emacs-lisp
+    (defun backward-local-mark()
+      "pop local mark, pushing current point if not on ring"
+      (interactive)
+      (push-local-mark-maybe)
+      (pop-to-mark-command))
+(bind-key* "<f6> v" 'backward-local-mark)
+#+END_SRC
+
+*** local forward mark
+#+BEGIN_SRC emacs-lisp
+(defun unpop-to-mark-command ()
+  "Unpop off mark ring. Does nothing if mark ring is empty."
+  (interactive)
+  (push-local-mark-maybe)
+      (when mark-ring
+        (setq mark-ring (cons (copy-marker (mark-marker)) mark-ring))
+        (set-marker (mark-marker) (car (last mark-ring)) (current-buffer))
+        (when (null (mark t)) (ding))
+        (setq mark-ring (nbutlast mark-ring))
+        (goto-char (marker-position (car (last mark-ring))))))
+(bind-key* "<f5> z" 'unpop-to-mark-command)
+#+END_SRC
+*** global push mark maybe
+#+BEGIN_SRC emacs-lisp
+  (defun push-global-mark-maybe () 
+    "push mark onto `global-mark-ring' if mark head or tail is not current location"
+    (if (not global-mark-ring) (error "global-mark-ring empty")
+      (unless (or (marker-is-point-p (car global-mark-ring))
+                  (marker-is-point-p (car (reverse global-mark-ring))))
+        (push-mark))))
+#+END_SRC
+*** global back mark
+#+BEGIN_SRC emacs-lisp
+(defun backward-global-mark () 
+  "use `pop-global-mark', pushing current point if not on ring."
+  (interactive)
+  (push-global-mark-maybe)
+  (when (marker-is-point-p (car global-mark-ring))
+    (call-interactively 'pop-global-mark))
+  (call-interactively 'pop-global-mark))
+(bind-key* "<f6> u" 'backward-global-mark)
+#+END_SRC
+*** global forward mark
+#+BEGIN_SRC emacs-lisp
+(defun forward-global-mark ()
+  "hack `pop-global-mark' to go in reverse, pushing current point if not on ring."
+  (interactive)
+  (push-global-mark-maybe)
+  (setq global-mark-ring (nreverse global-mark-ring))
+  (when (marker-is-point-p (car global-mark-ring))
+    (call-interactively 'pop-global-mark))
+  (call-interactively 'pop-global-mark)
+  (setq global-mark-ring (nreverse global-mark-ring)))
+(bind-key* "<f6> f" 'forward-global-mark)
+#+END_SRC
+** block, indentation, whitespace nav
+- have to work on this to get it to install and run correctly
+- because it's not in melpa (block-nav)
+- delete this list if installation goes smoothly
+#+BEGIN_SRC emacs-lisp
+  (use-package block-nav
+    :straight (block-nav :type git :host github :repo "nixin72/block-nav.el")
+    :custom
+    (block-nav-move-skip-shallower t)
+    :config
+    (defun my-block-nav-next-block ()
+      (interactive)
+      (back-to-indentation)
+      (block-nav-next-block))
+    (defun my-block-nav-previous-block ()
+      (interactive)
+      (back-to-indentation)
+      (block-nav-previous-block))
+    (defun my-block-nav-next-indentation-level ()
+      (interactive)
+      (back-to-indentation)
+      (block-nav-next-indentation-level))
+    (defun my-block-nav-previous-indentation-level ()
+      (interactive)
+      (back-to-indentation)
+      (block-nav-previous-indentation-level))
+    (defun my-block-nav-prog-bindings ()
+      (bind-key "C-c C-n" 'my-block-nav-next-block prog-mode-map)
+      (bind-key "C-c C-p" 'my-block-nav-previous-block prog-mode-map)
+      (bind-key "<f6> p" 'my-block-nav-next-indentation-level prog-mode-map)
+      (bind-key '"C-c C-u" 'my-block-nav-previous-indentation-level prog-mode-map)    
+      )
+    (defun my-block-nav-python-bindings ()
+      (bind-key "C-c C-n" 'my-block-nav-next-block python-mode-map)
+      (bind-key "C-c C-p" 'my-block-nav-previous-block python-mode-map)
+      (bind-key "<f6> p" 'my-block-nav-next-indentation-level python-mode-map)
+      (bind-key '"C-c C-u" 'my-block-nav-previous-indentation-level python-mode-map)
+      )
+    :hook
+    (prog-mode . my-block-nav-prog-bindings)
+    (python-mode . my-block-nav-python-bindings)
+    )
+  (use-package spatial-navigate
+    :straight (:package "spatial-navigate" :host nil :type git :repo "https://gitlab.com/ideasman42/emacs-spatial-navigate")
+    :config
+    (defun my-spatial-navigate-prog-bindings ()
+      (bind-key "C-c C-f" 'spatial-navigate-forward-vertical-bar prog-mode-map)
+      (bind-key "C-c C-b" 'spatial-navigate-backward-vertical-bar prog-mode-map)
+      )
+    (defun my-spatial-navigate-python-bindings ()
+      (bind-key "C-c C-f" 'spatial-navigate-forward-vertical-bar python-mode-map)
+      (bind-key "C-c C-b" 'spatial-navigate-backward-vertical-bar python-mode-map)
+      )
+    :hook
+    (python-mode . my-spatial-navigate-python-bindings)
+    (prog-mode . my-spatial-navigate-prog-bindings)
+    )
+
+#+END_SRC
+** visible mark
+my repo coming from:  https://git.sr.ht/~iank/visible-mark
+which is the new location originally moved from: https://gitlab.com/iankelling/visible-mark
+#+BEGIN_SRC emacs-lisp
+  (straight-use-package '(visible-mark :type git :host github :repo "nathanvercaemert/visible-mark"))
+  (defface visible-mark-active
+    '((((type tty) (class mono)))
+      (t (:background "magenta"))) "")
+  (defface visible-mark-face1
+    '((((type tty) (class mono)))
+      (t (:background "light salmon" :foreground "black")))  
+    "Example face which can be customized and added to subsequent face lists."
+    :group 'visible-mark)
+  (defface visible-mark-face2
+    '((((type tty) (class mono)))
+      (t (:background "light goldenrod" :foreground "black")))
+    "Example face which can be customized and added to subsequent face lists."
+    :group 'visible-mark)
+  (setq visible-mark-max 2)
+  (setq visible-mark-faces `(visible-mark-face1 visible-mark-face2))
+  (require 'visible-mark)
+  (global-visible-mark-mode 1)
+#+END_SRC
+* window/buffer functions
+** split window
+#+BEGIN_SRC emacs-lisp
+  (defun my-split-window-vertical ()
+    (interactive)
+    (split-window-below)
+    (other-window 1)
+    (balance-windows))
+  (defun my-split-window-horizontal ()
+    (interactive)
+    (split-window-right)
+    (other-window 1)
+    (balance-windows))
+    (bind-key* "<f5> a" 'my-split-window-vertical)
+    (bind-key* "<f5> b" 'my-split-window-horizontal)
+#+END_SRC
+** kill window
+#+BEGIN_SRC emacs-lisp
+  (defun my-kill-window ()
+    (interactive)
+    (delete-window)
+    (balance-windows))
+    (bind-key* "<f5> c" 'my-kill-window)
+
+#+END_SRC
+** kill this buffer
+#+BEGIN_SRC emacs-lisp
+  (setq not-to-kill-buffer-list '("*scratch*" "*Messages*"))
+  (defun kill-buffer-but-not-some ()
+    (interactive)
+    (if (member (buffer-name (current-buffer)) not-to-kill-buffer-list)
+        (bury-buffer)
+      (kill-buffer (current-buffer))))
+  (bind-key* "<f5> f" 'kill-buffer-but-not-some)
+#+END_SRC
+** windmove
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f5> k" 'windmove-right)
+  (bind-key* "<f5> h" 'windmove-up)
+  (bind-key* "<f5> i" 'windmove-left)
+  (bind-key* "<f5> l" 'windmove-down)
+#+END_SRC
+** my delete other windows
+I think this forces the "only window" functionality. I've had some issues with the window I want to become the only window not Beckman the only window.
+#+BEGIN_SRC emacs-lisp
+  (defun my-delete-other-windows ()
+    (interactive)
+    (setq temp ignore-window-parameters)
+    (setq ignore-window-parameters t)
+    (delete-other-windows)
+    (setq ignore-window-parameters temp)
+    )
+  (bind-key* "<f5> m" 'my-delete-other-windows)
+#+END_SRC
+* bookmarks
+** only list the names of bookmarks
+#+BEGIN_SRC emacs-lisp
+  (setq bookmark-bmenu-toggle-filenames nil)
+#+END_SRC
+
+** startup to bookmarks
+#+BEGIN_SRC emacs-lisp
+  (setq inhibit-splash-screen t)
+  (require 'bookmark)
+  (list-bookmarks)
+  (switch-to-buffer "*Bookmark List*")
+#+END_SRC
+
+** save bookmarks with every bookmark action
+#+BEGIN_SRC emacs-lisp
+(setq bookmark-save-flag 1)
+#+END_SRC
+* (auto revert) reload files when changed externally
+** set auto-revert so that it's time based instead of system notification
+#+BEGIN_SRC emacs-lisp
+(setq auto-revert-verbose nil)
+(setq auto-revert-interval 1)
+#+END_SRC
+
+** turn auto-revert-mode on everywhere
+#+BEGIN_SRC emacs-lisp
+  (global-auto-revert-mode)
+  ;; (defun revert-buffer-no-confirm ()
+  ;;     "Revert buffer without confirmation."
+  ;;     (interactive)
+  ;;     (revert-buffer :ignore-auto :noconfirm))
+#+END_SRC
+** crazy long shot code that might do what I want
+#+BEGIN_SRC emacs-lisp
+;;
+;; Fix the auto-revert-handler so that if the system time is the
+;; same as the new modified time for a file, skip it on this
+;; iteration. This should fix race conditions when a file is changed
+;; multiple times within the same second.
+;;
+
+(defun file-change-too-close-for-comfort ()
+  (let* ((file-time-raw (nth 5 (file-attributes (buffer-file-name))))
+         (file-time (+ (lsh (nth 0 file-time-raw) 16) (nth 1 file-time-raw)))
+         (current-time (+ (lsh (nth 0 (current-time)) 16) (nth 1 (current-time)))))
+    (and (eq current-time file-time)
+         (message "%s: postpone revert" (buffer-name))
+         t)))
+
+
+(defun auto-revert-handler ()
+  "Revert current buffer, if appropriate.
+This is an internal function used by Auto-Revert Mode."
+  (when (or auto-revert-tail-mode (not (buffer-modified-p)))
+    (let* ((buffer (current-buffer)) size
+           (revert
+            (or (and buffer-file-name
+                     (file-readable-p buffer-file-name)
+                     (if auto-revert-tail-mode
+                         ;; Tramp caches the file attributes.  Setting
+                         ;; `tramp-cache-inhibit' forces Tramp to
+                         ;; reread the values.
+                         (let ((tramp-cache-inhibit-cache t))
+                           (/= auto-revert-tail-pos
+                               (setq size
+                                     (nth 7 (file-attributes
+                                             buffer-file-name)))))
+                       (and (not (file-remote-p buffer-file-name))
+                            (not (verify-visited-file-modtime buffer))
+                            (not (file-change-too-close-for-comfort)))))
+                (and (or auto-revert-mode
+                         global-auto-revert-non-file-buffers)
+                     revert-buffer-function
+                     (boundp 'buffer-stale-function)
+                     (functionp buffer-stale-function)
+                     (funcall buffer-stale-function t))))
+           eob eoblist)
+      (when revert
+        (when (and auto-revert-verbose
+                   (not (eq revert 'fast)))
+          (message "Reverting buffer `%s'." (buffer-name)))
+        ;; If point (or a window point) is at the end of the buffer,
+        ;; we want to keep it at the end after reverting.  This allows
+        ;; to tail a file.
+        (when buffer-file-name
+          (setq eob (eobp))
+          (walk-windows
+           #'(lambda (window)
+               (and (eq (window-buffer window) buffer)
+                    (= (window-point window) (point-max))
+                    (push window eoblist)))
+           'no-mini t))
+        (if auto-revert-tail-mode
+            (auto-revert-tail-handler size)
+          ;; Bind buffer-read-only in case user has done C-x C-q,
+          ;; so as not to forget that.  This gives undesirable results
+          ;; when the file's mode changes, but that is less common.
+          (let ((buffer-read-only buffer-read-only))
+            (revert-buffer 'ignore-auto 'dont-ask 'preserve-modes)))
+        (when buffer-file-name
+          (when eob (goto-char (point-max)))
+          (dolist (window eoblist)
+            (set-window-point window (point-max)))))
+      ;; `preserve-modes' avoids changing the (minor) modes.  But we
+      ;; do want to reset the mode for VC, so we do it manually.
+      (when (or revert auto-revert-check-vc-info)
+        (vc-find-file-hook)))))
+#+END_SRC
+* plantuml
+#+BEGIN_SRC emacs-lisp
+  (use-package plantuml-mode
+    :mode "\\.plantuml\\'")
+  (setq org-plantuml-jar-path (expand-file-name "~/Utilities/plantuml.jar"))
+  (add-to-list 'org-src-lang-modes '("plantuml" . plantuml))
+  (org-babel-do-load-languages 'org-babel-load-languages '((plantuml . t)))
+  (setq plantuml-indent-level 4)
+#+END_SRC
+* org roam
+** directory
+#+BEGIN_SRC emacs-lisp
+(setq org-roam-directory (file-truename "/home/nathanvercaemert/Zettelkasten/"))
+#+END_SRC
+** db autosync
+#+BEGIN_SRC emacs-lisp
+(org-roam-db-autosync-mode)
+#+END_SRC
+** core bindings
+*** visit thing
+#+BEGIN_SRC emacs-lisp
+  (define-key org-roam-mode-map [mouse-1] #'org-roam-visit-thing)
+#+END_SRC
+
+*** new node
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r n" 'org-roam-node-find)
+#+END_SRC
+*** new node capture
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r c" 'org-roam-capture)
+#+END_SRC
+
+*** new id
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r i" 'org-id-get-create)
+#+END_SRC
+
+*** insert link
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r l" 'org-roam-node-insert)
+#+END_SRC
+
+*** add alias
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r a" 'org-roam-alias-add)
+#+END_SRC
+
+** buffer
+#+BEGIN_SRC emacs-lisp
+  (defun org-roam-buffer-pop ()
+    (interactive)
+    (split-window-right)
+    (org-roam-buffer-toggle)
+    (other-window 1)
+    (make-frame-command)
+    (other-frame 2)
+    (delete-window)
+    (other-frame 1))
+  (defun org-roam-buffer-reload ()
+    (interactive)
+    (split-window-right)
+    (org-roam-buffer-toggle)
+    (org-roam-buffer-toggle)
+    ;; not necessary for notdeft
+    ;; (deft-refresh))
+    )
+  (bind-key* "<f9> r b" 'org-roam-buffer-pop)
+  (bind-key* "<f9> r <f9> r" 'org-roam-buffer-reload)
+#+END_SRC
+*** buffer appearance
+;#+BEGIN_SRC emacs-lisp
+(add-to-list 'display-buffer-alist
+             '("\\*org-roam\\*"
+               (display-buffer-in-direction)
+               (direction . right)
+               (window-width . 0.33)
+               (window-height . fit-window-to-buffer)))
+#+END_SRC
+
+** old capture templates
+;#+BEGIN_SRC emacs-lisp
+  (setq org-roam-capture-templates
+        '(("d" "default" plain "%?"
+           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
+                              "#+title: ${title}\n")
+           :unnarrowed t)
+          ("D" "default" plain "%?"
+           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
+                              "#+title: ${title}\n")
+           :unnarrowed t)))
+#+END_SRC
+* vterm
+#+BEGIN_SRC emacs-lisp
+(add-to-list 'load-path "~/Repositories/emacs-libvterm")
+(require 'vterm)
+#+END_SRC
+** don't prompt on kill
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'vterm-mode-hook 'set-no-process-query-on-exit)
+#+END_SRC
+** load vterm
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> d" 'vterm)
+#+END_SRC
+
+** prompt tracking issues
+;#+BEGIN_SRC emacs-lisp
+(setq vterm-use-vterm-prompt-detection-method nil)
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+(setq vterm-always-compile-module t)
+#+END_SRC
+
+** multi-term
+#+BEGIN_SRC emacs-lisp
+  ; do this after after vterm (need to convert vterm to use-package)
+  (use-package multi-vterm
+    :config
+    (bind-key* "<f6> g" 'multi-vterm)
+    )
+#+END_SRC
+** window size
+#+BEGIN_SRC emacs-lisp
+(setq vterm-min-window-width 65)
+#+END_SRC
+* dired
+[[*highlight current line (hl-line-mode)][highlight current line (hl-line-mode)]]
+** colors
+*** diredfl
+#+BEGIN_SRC emacs-lisp
+  (use-package diredfl
+    :config
+    (diredfl-global-mode))
+    ;; :hook
+    ;; (dired-mode . diredfl-mode))
+#+END_SRC
+*** dired rainbow
+#+BEGIN_SRC emacs-lisp
+  (use-package dired-rainbow
+    :after diredfl
+    :config
+    (progn
+      (dired-rainbow-define-chmod directory "#6cb2eb" "d.*")
+      (dired-rainbow-define html "#eb5286" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+      (dired-rainbow-define xml "#f2d024" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+      (dired-rainbow-define document "#9561e2" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+      (dired-rainbow-define markdown "#ffed4a" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+      (dired-rainbow-define database "#6574cd" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+      (dired-rainbow-define media "#de751f" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+      (dired-rainbow-define image "#f66d9b" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg"))
+      (dired-rainbow-define log "#c17d11" ("log"))
+      (dired-rainbow-define shell "#f6993f" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+      (dired-rainbow-define interpreted "#38c172" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+      (dired-rainbow-define compiled "#4dc0b5" ("asm" "cl" "lisp" "el" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+      (dired-rainbow-define executable "#8cc4ff" ("exe" "msi"))
+      (dired-rainbow-define compressed "#51d88a" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar"))
+      (dired-rainbow-define packaged "#faad63" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+      (dired-rainbow-define encrypted "#ffed4a" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+      (dired-rainbow-define fonts "#6cb2eb" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+      (dired-rainbow-define partition "#e3342f" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+      (dired-rainbow-define vc "#0074d9" ("git" "gitignore" "gitattributes" "gitmodules"))
+      (dired-rainbow-define-chmod executable-unix "#38c172" "-.*x.*"))) 
+#+END_SRC
+** do what I mean target
+#+BEGIN_SRC emacs-lisp
+(setq dired-dwim-target t)
+#+END_SRC
+** change listing order/contents
+#+BEGIN_SRC emacs-lisp
+  ;; (setq dired-listing-switches "-alDphgG")
+  (setq dired-listing-switches "-alDphgG")
+#+END_SRC
+** dired-details
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'dired-mode-hook
+            (lambda ()
+              (dired-hide-details-mode)))
+  (use-package emacs
+    :config
+    ;; overwrite so that it only hides the information line
+    ;; this function is originally from dired.el
+    (defun dired-hide-details-update-invisibility-spec ()
+      (funcall (if (and dired-hide-details-mode
+                        dired-hide-details-hide-information-lines)
+                   'add-to-invisibility-spec
+                 'remove-from-invisibility-spec)
+               'dired-hide-details-information))
+    )
+#+END_SRC
+** make file sizes make sense
+#+BEGIN_SRC emacs-lisp
+(setq dired-free-space-args "-Pm")
+#+END_SRC
+** make copies recursive always
+#+BEGIN_SRC emacs-lisp
+(setq dired-recursive-copies 'always)
+#+END_SRC
+** dired bindings
+#+BEGIN_SRC emacs-lisp
+  (bind-key "C-c C-n" 'dired-next-subdir dired-mode-map)
+  (bind-key "C-c C-p" 'dired-prev-subdir dired-mode-map)
+  (bind-key "C-c C-u" 'dired-tree-up dired-mode-map)
+  (bind-key "<f6> p" 'dired-maybe-insert-subdir dired-mode-map)
+  (bind-key "<f5> r" 'dired-kill-subdir dired-mode-map)
+#+END_SRC
+** open directory in explorer
+#+BEGIN_SRC emacs-lisp
+  (defun browse-file-directory ()
+    "Open the current file's directory however the OS would."
+    (interactive)
+    (setq directoryName (expand-file-name default-directory))
+    ;; (message "%s" directoryName))
+    (if default-directory
+        (browse-url-of-file (concat "\\\\wsl$\\Ubuntu\\" directoryName))
+      (error "No `default-directory' to open")))
+  (bind-key* "<f5> p" 'browse-file-directory)
+#+END_SRC
+** dired filter
+this hides dot files (and hides the message saying they're being hidden)
+#+BEGIN_SRC emacs-lisp
+  (use-package dired-filter
+    :custom
+    (dired-filter-show-filters nil)
+    :hook
+    (dired-mode . dired-filter-by-dot-files))
+#+END_SRC
+** hide permissions
+#+BEGIN_SRC emacs-lisp
+  (use-package dired-hide-permissions
+    :demand t
+    :straight (dired-hide-permissions :type git :host github :repo "cpardotortosa/dired-hide-permissions"
+                                      :fork (:host github
+                                                   :repo "nathanvercaemert/dired-hide-permissions"))
+    :init
+    (ignore-errors (require 'dired-hide-permissions))
+    (dired-hide-permissions-mode-always)
+    )
+#+END_SRC
+*** if this ever stops working, here are some resources
+- add ls script for: alias ls="ls -lhaG --color=always | sed -re 's/^[^ ]* //'"
+- this issue shows how to mess with dired directory program
+  - https://github.com/d12frosted/homebrew-emacs-plus/issues/383
+* phi-search
+#+BEGIN_SRC emacs-lisp
+  (require 'phi-search)
+#+END_SRC
+* interaction log
+#+BEGIN_SRC emacs-lisp
+  (require 'interaction-log)
+  (interaction-log-mode +1)
+  (global-set-key
+   (kbd "C-h C-l")
+   (lambda () (interactive) (display-buffer ilog-buffer-name)))
+#+END_SRC
+* flyspell
+** basic emacswiki setup
+#+BEGIN_SRC emacs-lisp
+  (defun flyspell-on-for-buffer-type ()
+    "Enable Flyspell appropriately for the major mode of the current buffer.  Uses `flyspell-prog-mode' for modes derived from `prog-mode', so only strings and comments get checked.  All other buffers get `flyspell-mode' to check all text.  If flyspell is already enabled, does nothing."
+    (interactive)
+    (if (not (eq major-mode 'vterm-mode)) ; flyspell causes problems in vterm
+        (if (not (symbol-value flyspell-mode)) ; if not already on
+            (progn
+              (if (derived-mode-p 'prog-mode)
+                  (progn
+                    ;; (message "Flyspell on (code)")
+                    (flyspell-prog-mode))
+                ;; else
+                (progn
+                  ;; (message "Flyspell on (text)")
+                  (flyspell-mode 1)))
+              ;; I tried putting (flyspell-buffer) here but it didn't seem to work
+              ))))
+
+  (defun flyspell-toggle ()
+    "Turn Flyspell on if it is off, or off if it is on.  When turning on, it uses `flyspell-on-for-buffer-type' so code-vs-text is handled appropriately."
+    (interactive)
+    (if (symbol-value flyspell-mode)
+        (progn ; flyspell is on, turn it off
+          ;; (message "Flyspell off")
+          (flyspell-mode -1))
+                                          ; else - flyspell is off, turn it on
+      (flyspell-on-for-buffer-type)))
+
+  (add-hook 'find-file-hook 'flyspell-on-for-buffer-type)
+
+  (add-hook 'after-change-major-mode-hook 'flyspell-on-for-buffer-type)
+
+  ;; (add-hook 'vterm-mode-hook (flyspell-mode -1))
+#+END_SRC
+* ripgrep
+#+BEGIN_SRC emacs-lisp
+  (require 'rg)
+  (rg-enable-default-bindings)
+  (bind-key* "C-M-x C-M-s" 'wgrep-save-all-buffers)
+  (bind-key* "<f6> e" 'rg)
+#+END_SRC
+** old deadgrep
+;#+BEGIN_SRC emacs-lisp
+  (use-package deadgrep
+    :demand t
+    ;; :custom
+    ;; (deadgrep--context (5 . 5))
+    :config
+    (defun my-deadgrep-hook ()
+      (setq-local deadgrep--context (5 . 5)))
+    (add-hook 'deadgrep-finished-hook #'my-deadgrep-hook)
+    )
+#+END_SRC
+* undo, redo, and undo-tree
+q 'undo-tree-visualizer-quit
+C-q 'undo-tree-visualizer-abort
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f5> 4"  'undo)
+  (use-package undo-tree
+    :diminish
+    :config
+    (global-undo-tree-mode +1)
+    (bind-key* "M-<f5> M-4" 'undo-tree-visualize)
+    (bind-key* "C-<f5> C-4"  'undo-tree-redo))
+#+END_SRC
+* markdown (github style)
+#+BEGIN_SRC emacs-lisp
+  (use-package markdown-mode
+    :straight (markdown-mode :type git :host github :repo "jrblevin/markdown-mode")
+    :mode ("\\.md$" . gfm-mode))
+#+END_SRC
+* flycheck
+** basic setup
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck
+    :config
+    (setq flycheck-emacs-lisp-load-path 'inherit)
+    )
+#+END_SRC
+* programming
+** color identifiers mode
+#+BEGIN_SRC emacs-lisp
+  (use-package color-identifiers-mode
+    :defer
+    :hook prog-mode
+    :config
+    (defun restart-color-identifiers-mode ()
+      (interactive)
+      (color-identifiers-mode))
+    (bind-key* "<f5> 7" 'color-identifiers-mode)
+    )
+#+END_SRC
+** syntax highlighting tree sitter
+this solves the issue of unusably slow font locking in keymap.c
+#+BEGIN_SRC emacs-lisp
+  (straight-use-package 'tree-sitter)
+  (straight-use-package 'tree-sitter-langs)
+  (require 'tree-sitter)
+  (require 'tree-sitter-langs)
+  (add-hook 'c-mode-hook #'tree-sitter-mode)
+  (add-hook 'c-mode-hook #'tree-sitter-hl-mode)
+  (add-hook 'c++-mode-hook #'tree-sitter-mode)
+  (add-hook 'c++-mode-hook #'tree-sitter-hl-mode)
+#+END_SRC
+** cmake font lock
+from jweigly
+#+BEGIN_SRC emacs-lisp
+  (use-package cmake-font-lock
+    :hook (cmake-mode . cmake-font-lock-activate))
+#+END_SRC
+** emacs-lisp
+[[*aggresive indent][aggresive indent]]
+** clojure
+#+BEGIN_SRC emacs-lisp
+(unless (package-installed-p 'clojure-mode)
+  (package-install 'clojure-mode))
+#+END_SRC
+** python Dev
+don't forget I might need some kind of flycheck
+*** org mode python
+#+BEGIN_SRC emacs-lisp
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((python . t)))
+#+END_SRC
+**** org babel python command
+#+BEGIN_SRC emacs-lisp
+(setq org-babel-python-command "python3")
+#+END_SRC
+*** make sexp normal in python mode
+#+BEGIN_SRC emacs-lisp
+(add-hook 'python-mode-hook
+        (lambda () (setq forward-sexp-function nil)))
+#+END_SRC
+*** old pyvenv
+You can use (add-dir-local-variable) to set pyvenv-workon for a particular project.
+;#+BEGIN_SRC emacs-lisp
+(use-package pyvenv
+  :demand t
+  :config
+  (setq pyvenv-workon "emacs")  ; Default venv
+  (pyvenv-tracking-mode 1))  ; Automatically use pyvenv-workon via dir-locals
+#+END_SRC
+*** old python mode
+;#+BEGIN_SRC emacs-lisp
+  (use-package python-mode
+    :defer t
+    :custom
+    ;; NOTE: Set these if Python 3 is called "python3" on your system!
+    (python-shell-interpreter "python3")
+    (dap-python-executable "python3")
+    (dap-python-debugger 'debugpy)
+    :hook
+    (python-mode . lsp))
+#+END_SRC
+
+** rust
+#+BEGIN_SRC emacs-lisp
+  (use-package rustic
+    :ensure
+    :mode ("\\.rs\\'" . rustic-mode)
+    :hook
+    (rustic-mode . rk/rustic-mode-hook-fn)
+    )
+
+  (defun rk/rustic-mode-hook ()
+    ;; so that run C-c C-c C-r works without having to confirm, but don't try to
+    ;; save rust buffers that are not file visiting. Once
+    ;; https://github.com/brotzeit/rustic/issues/253 has been resolved this should
+    ;; no longer be necessary.
+    (when buffer-file-name
+      (setq-local buffer-save-without-query t)))
+#+END_SRC
+** scad mode
+#+BEGIN_SRC emacs-lisp
+  (use-package scad-mode)
+#+END_SRC
+** old lsp-mode
+;#+BEGIN_SRC emacs-lisp
+  (use-package lsp-mode
+    :straight (lsp-mode :type git :host github :repo "emacs-lsp/lsp-mode")
+    :defer t
+    :commands lsp
+    :custom
+    ;; (lsp-clients-clangd-executable "clangd")
+
+    (lsp-headerline-breadcrumb-enable nil)
+    (lsp-signature-auto-activate nil)
+
+    ;; capf
+    ;; (lsp-completion-enable t)
+    ;; (lsp-completion-provider :capf)
+    ;; (lsp-prefer-capf t)
+
+    ;; hack because the warning is annoying
+    ;; this is probably going to cause problems on large repositories
+    ;; but qmk is this size and it doesn't cause a noticable difference
+    (lsp-file-watch-threshold 20000)
+
+    ;; what to use when checking on-save. "check" is default, I prefer clippy
+    (lsp-rust-analyzer-cargo-watch-command "clippy")
+
+    ;; enable / disable the hints as you prefer:
+    (lsp-rust-analyzer-server-display-inlay-hints t)
+    (lsp-rust-analyzer-display-lifetime-elision-hints-enable "skip_trivial")
+    (lsp-rust-analyzer-display-chaining-hints t)
+    (lsp-rust-analyzer-display-lifetime-elision-hints-use-parameter-names nil)
+    (lsp-rust-analyzer-display-closure-return-type-hints t)
+    (lsp-rust-analyzer-display-parameter-hints nil)
+    (lsp-rust-analyzer-display-reborrow-hints nil)
+    :config
+    (dolist (m (list lsp-mode-map))
+      (bind-keys :map m
+                 ("C-c C-n" . my-block-nav-next-block)
+                 ("C-c C-p" . my-block-nav-previous-block)
+                 ("<f6> p" . my-block-nav-next-indentation-level)
+                 ("C-c C-u" . my-block-nav-previous-indentation-level)
+                 ("C-c C-f" . spatial-navigate-forward-vertical-bar)
+                 ("C-c C-b" . spatial-navigate-backward-vertical-bar)))
+    )
+
+  (use-package lsp-ui
+    :after lsp-mode
+    :hook (lsp-mode . lsp-ui-mode)
+    :custom
+    (lsp-ui-doc-enable nil)
+    (lsp-ui-peek-always-show t)
+    :config
+    (define-key lsp-ui-mode-map [remap xref-find-definitions]
+      #'lsp-ui-peek-find-definitions)
+    ;; this is a nice outline
+    ;; (define-key lsp-ui-mode-map [remap counsel-imenu]
+    ;;   #'lsp-ui-imenu)
+    (define-key lsp-ui-mode-map [remap xref-find-references]
+      #'lsp-ui-peek-find-references))
+#+END_SRC
+*** control indentation from [[*indentation][indentation]] instead of lsp
+;#+BEGIN_SRC emacs-lisp
+  (setq lsp-enable-indentation nil)
+#+END_SRC
+** old debugging
+;#+BEGIN_SRC emacs-lisp
+  (use-package dap-mode
+    :defer t
+    :after lsp-mode
+    :config
+    (require 'dap-python)
+    (require 'dap-ui)
+    (dap-mode t)
+    (dap-ui-mode t)
+    ;; enables mouse hover support
+    (dap-tooltip-mode t)
+    ;; if it is not enabled `dap-mode' will use the minibuffer.
+    (tooltip-mode t)
+
+    (dap-register-debug-template "leetcode"
+                                 (list :type "python"
+                                       :args ""
+                                       :cwd nil
+                                       :env '(("DEBUG" . "1"))
+                                       :target-module (expand-file-name "/home/nathanvercaemert/leetcode/leetcode.py")
+                                       :request "launch"
+                                       :name "leetcode"))
+    )
+#+END_SRC
+;#+BEGIN_SRC emacs-lisp
+  (bind-key* "C-<f9>" 'dap-breakpoint-toggle) ; index up
+  ;; (bind-key* "C-<f10>" 'gud-remove) ; middle up
+  (bind-key* "C-<f5>" 'dap-step-in) ; index
+  ;; (bind-key* "C-<f1>" ') ; index down
+  (bind-key* "C-<f7>" 'dap-step-out) ; ring
+  ;; (bind-key* "C-<f3>" 'gud-down) ; ring down
+  (bind-key* "C-<f6>" 'dap-next) ; middle
+  ;; (bind-key* "C-<f2>" ') ; middle down
+  ;; (bind-key* "C-<f11>" 'gud-up) ; ring up
+  ;; (bind-key* "C-<f12>" 'gud-print) ; pinky up
+  ;; (bind-key* "C-<f8>" 'gud-finish) ; pinky
+#+END_SRC
+**** old dap-mode
+;#+BEGIN_SRC emacs-lisp
+(use-package dap-mode
+  ;; Uncomment the config below if you want all UI panes to be hidden by default!
+  ;; :custom
+  ;; (lsp-enable-dap-auto-configure nil)
+  ;; :config
+  ;; (dap-ui-mode 1)
+
+  :config
+  ;; Set up Node debugging
+  (require 'dap-node)
+  (dap-node-setup) ;; Automatically installs Node debug adapter if needed
+
+  ;; Bind `C-c l d` to `dap-hydra` for easy access
+  (general-define-key
+    :keymaps 'lsp-mode-map
+    :prefix lsp-keymap-prefix
+    "d" '(dap-hydra t :wk "debugger")))
+#+END_SRC
+** old c/c++
+*** old gtags mode
+didn't work
+installed gtags
+installed tarball from https://www.gnu.org/software/global/download.html
+;#+BEGIN_SRC emacs-lisp
+  (use-package gtags-mode
+    :straight (gtags-mode :type git :host github :repo "Ergus/gtags-mode")
+    :config
+    (gtags-mode)
+    (defun gtags-update-single(filename)  
+      "Update Gtags database for changes in a single file"
+      (interactive)
+      (start-process "update-gtags" "update-gtags" "bash" "-c" (concat "cd " (gtags-root-dir) " ; gtags --single-update " filename )))
+    (defun gtags-update-current-file()
+      (interactive)
+      (defvar filename)
+      (setq filename (replace-regexp-in-string (gtags-root-dir) "." (buffer-file-name (current-buffer))))
+      (gtags-update-single filename)
+      (message "Gtags updated for %s" filename))
+    (defun gtags-update-hook()
+      "Update GTAGS file incrementally upon saving a file"
+      (when gtags-mode
+        (when (gtags-root-dir)
+          (gtags-update-current-file))))
+    (add-hook 'after-save-hook 'gtags-update-hook))
+
+#+END_SRC
+*** irony
+;#+BEGIN_SRC emacs-lisp
+  (use-package irony
+    :defer t
+    :hook
+    (c++-mode . irony-mode)
+    (c-mode . irony-mode)
+    (objc-mode . irony-mode)
+    (irony-mode . irony-cdb-autosetup-compile-options)
+    (irony-mode . company-mode)
+    (irony-mode . flycheck-mode)
+    (irony-mode . flycheck-irony-setup)
+    )
+#+END_SRC
+*** language server
+use ccls
+;#+BEGIN_SRC emacs-lisp
+  (use-package ccls
+    :init
+    (setq ccls-executable "~/Repositories/ccls/Release/ccls")
+    :hook
+    ((c-mode c++-mode objc-mode cuda-mode) .
+     (lambda () (require 'ccls) (lsp)))
+    )
+#+END_SRC
+use clangd
+;#+BEGIN_SRC emacs-lisp
+  (use-package eglot
+    :config
+    (add-to-list 'eglot-server-programs '((c++-mode c-mode) "clangd"))
+    (add-hook 'c-mode-hook 'eglot-ensure)
+    (add-hook 'c++-mode-hook 'eglot-ensure)
+    )
+
+  ;; (add-hook 'c-mode-hook 'lsp)
+  ;; (add-hook 'c++-mode-hook 'lsp)
+#+END_SRC
+*** cmake mode
+from jweigly
+#+BEGIN_SRC emacs-lisp
+  (use-package cmake-mode
+    :mode ("CMakeLists.txt" "\\.cmake\\'"))
+#+END_SRC
+*** old c++
+**** performance issues
+this fixes the performance issues for keymap.c (it also makes everything else look uglier
+;#+BEGIN_SRC emacs-lisp
+  (setq font-lock-maximum-decoration
+        '((c-mode . 2) (c++-mode . 2)))
+#+END_SRC
+this does it without making everything else ugly
+;#+BEGIN_SRC emacs-lisp
+  (use-package modern-cpp-font-lock
+    :hook
+    ((c-mode c++-mode objc-mode cuda-mode) . modern-c++-font-lock-mode))
+#+END_SRC
+switched to trying tree-sitter-mode
+** old java
+*** jdee
+would need to make sure jdee package installed
+
+;#+BEGIN_SRC emacs-lisp
+  (setq jdee-server-dir "/home/nathanvercaemert/Repositories/jdee-server/target/")
+  (autoload 'jde-mode "jde" "JDE mode" t)
+  (setq auto-mode-alist
+        (append '(("\\.java\\'" . jde-mode)) auto-mode-alist))
+#+END_SRC
+*** lsp-java
+
+;#+BEGIN_SRC emacs-lisp
+
+  (require 'lsp-java)
+  (add-hook 'java-mode-hook #'lsp)
+
+  (condition-case nil
+      (require 'use-package)
+    (file-error
+     (require 'package)
+     (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/"))
+     (package-initialize)
+     (package-refresh-contents)
+     (package-install 'use-package)
+     (setq use-package-always-ensure t)
+     (require 'use-package)))
+  (use-package lsp-mode :hook ((lsp-mode . lsp-enable-which-key-integration))
+    :config (setq lsp-completion-enable-additional-text-edit nil))
+  (use-package hydra)
+  (use-package lsp-java :config (add-hook 'java-mode-hook 'lsp))
+  (use-package dap-mode :after lsp-mode :config (dap-auto-configure-mode))
+  (use-package dap-java :ensure nil)
+  (use-package helm-lsp)
+  (define-key lsp-mode-map [remap xref-find-apropos] #'helm-lsp-workspace-symbol)
+  ;; (use-package helm
+  ;;   :config (helm-mode))
+  (use-package lsp-treemacs)
+
+  (define-key lsp-mode-map [remap xref-find-apropos] #'helm-lsp-workspace-symbol)
+  (define-key lsp-mode-map [remap xref-find-references] #'lsp-find-references)
+
+  ;; (setq lsp-java-workspace-dir "/home/nathanvercaemert/eclipse-workspace/jsword")
+
+#+END_SRC
+* term-keys
+alacritty --config-file C:\Users\a686051\AppData\Roaming\alactritty\alacritty.yml
+
+alacritty.yml generated per term-key instructions on github
+
+alacritty --config-file C:\Users\a686051\AppData\Roaming\alactritty\alacritty.yml -e wsl -d Ubuntu --user nathanvercaemert emacsclient -nw
+
+note that you have to override the default keybindings like so (these are added to the .yml file):
+- { key: Home, mods: Shift, chars: "\x1b\x5b\x31\x3b\x32\x48" }
+
+the process for finding these "original" sequences:
+sed -n l (run this in linux (so wsl), and type S-<home>) (make sure to do this in powershell because vterm is its own emulator)
+this outputs ^[[1;2H which is then translated with an ASCII table to hex
+
+printf "the_output_of_sed" | od -t x1
+this converts to hex (doesn't C-things "^[")
+#+BEGIN_SRC emacs-lisp
+  (straight-use-package
+   '(term-keys :type git :host github :repo "CyberShadow/term-keys"
+               :fork (:host github
+                            :repo "nathanvercaemert/term-keys")))
+  (require 'term-keys)
+  (term-keys-mode t)
+#+END_SRC
+* old stuff to be removed
+** old deft
+;#+BEGIN_SRC emacs-lisp
+    (require 'deft)
+    (setq deft-directory "/home/nathanvercaemert/Zettelkasten/")
+    (setq deft-auto-save-interval 0)
+  ;  (bind-key* "<f6> c" 'deft)
+  ; replaced by notdeft
+#+END_SRC
+
+*** getting the right title
+;#+BEGIN_SRC emacs-lisp
+(defun cm/deft-parse-title (file contents)
+    "Parse the given FILE and CONTENTS and determine the title.
+  If `deft-use-filename-as-title' is nil, the title is taken to
+  be the first non-empty line of the FILE.  Else the base name of the FILE is
+  used as title."
+      (let ((begin (string-match "^#\\+[tT][iI][tT][lL][eE]: .*$" contents)))
+	(if begin
+	    (string-trim (substring contents begin (match-end 0)) "#\\+[tT][iI][tT][lL][eE]: *" "[\n\t ]+")
+	  (deft-base-filename file))))
+  
+    (advice-add 'deft-parse-title :override #'cm/deft-parse-title)
+  
+    (setq deft-strip-summary-regexp
+	  (concat "\\("
+		  "[\n\t]" ;; blank
+		  "\\|^#\\+[[:alpha:]_]+:.*$" ;; org-mode metadata
+		  "\\|^:PROPERTIES:\n\\(.+\n\\)+:END:\n"
+		  "\\)"))
+#+END_SRC
+** old notdeft
+;#+BEGIN_SRC emacs-lisp
+  (setq notdeft-xapian-program-compile-command-format "g++ -o %s %s -std=c++11 -Wall `pkg-config --cflags --libs tclap` `xapian-config --cxxflags --libs`")
+  (add-hook 'notdeft-load-hook 'notdeft-xapian-make-program-when-uncurrent)
+  (setq notdeft-directories '("~/Zettelkasten"))
+  (setq notdeft-extension "org")
+  (setq notdeft-xapian-program "/home/nathanvercaemert/.emacs.d/straight/repos/notdeft/xapian/notdeft-xapian")
+  ;; if the following variable wasn't nil, results would be ordered by most recent edit. this uses xapian's ranking instead
+  (setq notdeft-xapian-order-by-time nil)
+  ;; make sure the not deft buffer stays up to date
+  (add-hook 'org-mode-hook 'notdeft-note-mode)
+  (bind-key* "<f6> c" 'notdeft)
+#+END_SRC
+** old projectile
+*** setup
+;#+BEGIN_SRC emacs-lisp
+(require 'projectile)
+(projectile-mode +1)
+#+END_SRC
+*** caching
+;#+BEGIN_SRC emacs-lisp
+(setq projectile-enable-caching t)
+#+END_SRC
+*** indexing method
+;#+BEGIN_SRC emacs-lisp
+(setq projectile-indexing-method 'alien)
+#+END_SRC
+
+** old helm/ivy-bibtex
+;#+BEGIN_SRC emacs-lisp
+  (setq bibtex-completion-bibliography '("~/My Library.bib"))
+  (setq bibtex-completion-pdf-field "File")
+#+END_SRC
+** old desktop save mode
+;#+BEGIN_SRC emacs-lisp
+  (setq desktop-path (list "~/.emacs.d/"))
+  (desktop-save-mode 1)
+  (setq desktop-auto-save-timeout nil)
+#+END_SRC
+** old org ref
+;#+BEGIN_SRC emacs-lisp
+    (use-package org-ref)
+
+    (setq bibtex-completion-display-formats
+          '((article       . "${=has-pdf=:1}${=has-note=:1} ${year:4} ${author:36} ${title:*} ${journal:40}")
+            (inbook        . "${=has-pdf=:1}${=has-note=:1} ${year:4} ${author:36} ${title:*} Chapter ${chapter:32}")
+            (incollection  . "${=has-pdf=:1}${=has-note=:1} ${year:4} ${author:36} ${title:*} ${booktitle:40}")
+            (inproceedings . "${=has-pdf=:1}${=has-note=:1} ${year:4} ${author:36} ${title:*} ${booktitle:40}")
+            (t             . "${=has-pdf=:1}${=has-note=:1} ${year:4} ${author:36} ${title:*}")))
+
+    ;; one day maybe
+    ;; (require 'bibtex)
+
+    ;; (setq bibtex-autokey-year-length 4
+    ;;       bibtex-autokey-name-year-separator "-"
+    ;;       bibtex-autokey-year-title-separator "-"
+    ;;       bibtex-autokey-titleword-separator "-"
+    ;;       bibtex-autokey-titlewords 2
+    ;;       bibtex-autokey-titlewords-stretch 1
+    ;;       bibtex-autokey-titleword-length 5
+    ;;       org-ref-bibtex-hydra-key-binding (kbd "H-b"))
+
+    ;; (define-key bibtex-mode-map (kbd "H-b") 'org-ref-bibtex-hydra/body)
+
+    (require 'org-ref-ivy)
+    (setq org-ref-insert-link-function 'org-ref-insert-link-hydra/body
+        org-ref-insert-cite-function 'org-ref-cite-insert-ivy
+        org-ref-insert-label-function 'org-ref-insert-label-link
+        org-ref-insert-ref-function 'org-ref-insert-ref-link
+        org-ref-cite-onclick-function (lambda (_) (org-ref-citation-hydra/body)))
+
+    (define-key org-mode-map (kbd "C-c ]") 'org-ref-insert-link)
+
+    ;; (define-key org-mode-map (kbd "H-c") org-ref-insert-cite-function)
+    ;; (define-key org-mode-map (kbd "H-r") org-ref-insert-ref-function)
+    ;; (define-key org-mode-map (kbd "H-l") org-ref-insert-label-function)
+#+END_SRC
+** old org roam bibtex
+;#+BEGIN_SRC emacs-lisp
+  (use-package org-roam-bibtex
+    :after org-roam
+    :config
+    (org-roam-bibtex-mode)
+    )
+#+END_SRC
+** old zotero
+why isn't this colored? Maybe I'll never know
+;#+BEGIN_SRC emacs-lisp
+  (defun zotero-most-recent ()
+    (interactive)
+    (let ((default-directory "~")) 
+      (setq fileName
+            (substring
+             (shell-command-to-string "find ~/Zotero/storage -printf \"%T@ %Tc %p\n\" | sort -rn | grep -E '\.pdf$|\.html$' | head -n1 | awk '{print $NF}'")
+             ;; (shell-command-to-string "ls ~/Zotero -Rt | grep -E '\.pdf$|\.html$' | head -n1")j
+             0 -1))
+      (switch-to-buffer (find-file-noselect "~/My Library.bib" nil nil nil))
+      (beginning-of-buffer)
+      (search-forward fileName)
+      (search-backward "@")
+      (forward-word)
+      (forward-word)
+      (backward-kill-word 1)
+      (yank)
+      (save-buffer)
+      ;; (setq fileKey (current-kill 0 t))
+      (kill-buffer (current-buffer))
+      ;; (message "%s" fileKey)
+      )
+    (insert "[[cite:&")
+    (yank)
+    (insert "]]")
+    )
+  (bind-key* "<f6> t" 'zotero-most-recent)
+#+END_SRC
+** old pdf
+*** setup
+;#+BEGIN_SRC emacs-lisp
+  (require 'pdf-tools)
+  (use-package pdf-tools
+     :pin manual
+     :config
+     (pdf-tools-install)
+     (setq-default pdf-view-display-size 'fit-width)
+     (define-key pdf-view-mode-map (kbd "C-s") 'isearch-forward)
+     ;; :custom				
+     ;; (pdf-annot-activate-created-annotations t "automatically annotate highlights")
+     )
+  (setq TeX-view-program-selection '((output-pdf "PDF Tools"))
+        TeX-view-program-list '(("PDF Tools" TeX-pdf-tools-sync-view))
+        TeX-source-correlate-start-server t)
+
+  (add-hook 'TeX-after-compilation-finished-functions
+            #'TeX-revert-document-buffer)
+  (add-hook 'pdf-view-mode-hook (lambda() (linum-mode -1)))
+#+END_SRC
+*** change midnight mode colors
+;#+BEGIN_SRC emacs-lisp
+(setq pdf-view-midnight-colors '("#DDDDDD" . "#000000" ))
+
+(defun midnight-pdf-mode-no-filter ()
+  "View pdf without colour filter."
+  (interactive)
+  (pdf-view-midnight-minor-mode -1)
+  )
+
+;; change midnite mode colours functions
+(defun midnight-pdf-mode-original ()
+  "Set pdf-view-midnight-colors to original colours."
+  (interactive)
+  (setq pdf-view-midnight-colors '("#839496" . "#002b36" ))
+  (pdf-view-midnight-minor-mode)
+  )
+
+(defun midnight-pdf-mode-midnite ()
+  (interactive)
+  (setq pdf-view-midnight-colors '("#DDDDDD" . "#000000" ))
+  (pdf-view-midnight-minor-mode)
+  )
+#+END_SRC
+
+*** pdfs default to midnight mode
+;#+BEGIN_SRC emacs-lisp
+(add-hook 'pdf-view-mode-hook (lambda ()
+  (pdf-view-midnight-minor-mode)))
+#+END_SRC
+
+*** remove margins and scale to height
+;#+BEGIN_SRC emacs-lisp
+  (defun remove-margins-scale-height ()
+    (interactive)
+    (pdf-view-set-slice-from-bounding-box)
+    (pdf-view-fit-height-to-window))
+  (add-hook 'pdf-view-mode-hook 'remove-margins-scale-height)
+#+END_SRC
+
+
+*** continuous scroll mode
+**** load path
+;#+BEGIN_SRC emacs-lisp
+(add-to-list 'load-path "/home/nathanvercaemert/Repositories/pdf-continuous-scroll-mode.el")
+#+END_SRC
+**** use
+;#+BEGIN_SRC emacs-lisp
+;(use-package pdf-continuous-scroll-mode)
+(require 'pdf-continuous-scroll-mode)
+#+END_SRC
+
+**** startup hook
+;#+BEGIN_SRC emacs-lisp
+(add-hook 'pdf-view-mode-hook 'pdf-continuous-scroll-mode)
+#+END_SRC
+**** scroll step
+;#+BEGIN_SRC emacs-lisp
+(setq pdf-continuous-step-size 2)
+#+END_SRC
+**** binding to avoid error
+;#+BEGIN_SRC emacs-lisp
+  (defun my-pdf-cs-mouse-scroll-backward ()
+    (interactive)
+    (condition-case nil
+        (pdf-cs-mouse-scroll-backward)
+      (error nil))
+    )
+  (bind-key "<mouse-4>" 'my-pdf-cs-mouse-scroll-backward pdf-continuous-scroll-mode-map)
+  (defun my-pdf-cs-mouse-scroll-forward ()
+    (interactive)
+    (condition-case nil
+        (pdf-cs-mouse-scroll-forward)
+      (error nil))
+    )
+  (bind-key "<mouse-5>" 'my-pdf-cs-mouse-scroll-forward pdf-continuous-scroll-mode-map)
+#+END_SRC
+
+**** make scrolling up work
+;#+BEGIN_SRC emacs-lisp
+(define-key pdf-view-mode-map (kbd "<mouse-4>") 'pdf-continuous-scroll-backward)
+(define-key pdf-view-mode-map (kbd "<up>") 'pdf-continuous-scroll-backward)
+#+END_SRC
+*** hide mode line for pdf
+;#+BEGIN_SRC emacs-lisp
+  (require 'hide-mode-line)
+  (add-hook 'pdf-view-mode-hook #'hide-mode-line-mode)
+#+END_SRC
+
+*** old
+**** open pdfs in other window
+;#+BEGIN_SRC emacs-lisp
+  (defun pdf-open-other-frame ()
+    (interactive)
+    (make-frame-command)
+    (other-frame 2)
+    (delete-window)
+    (other-frame 1)
+    (hide-mode-line-mode))
+#+END_SRC
+
+** old mouse focus issues
+;#+BEGIN_SRC emacs-lisp
+  (setq focus-follows-mouse t)
+  (setq mouse-autoselect-window t)
+#+END_SRC
+** old garbage collection
+;#+BEGIN_SRC emacs-lisp
+  (setq gc-cons-threshold 1000000)
+#+END_SRC
+** old which key
+;#+BEGIN_SRC emacs-lisp
+(use-package which-key
+  :defer 5
+  :diminish
+  :commands which-key-mode
+  :config
+  (which-key-mode))
+#+END_SRC
+
+** old escape key quit
+;#+BEGIN_SRC emacs-lisp
+(define-key key-translation-map (kbd "ESC") (kbd "C-g"))
+#+END_SRC
+** old xah novel reading mode
+;#+BEGIN_SRC emacs-lisp
+  (defun xah-toggle-read-novel-mode ()
+    "Setup current frame to be suitable for reading long novel/article text.
+  • Set frame width to 70
+  • Line wrap at word boundaries.
+  • Line spacing is increased.
+  • Proportional width font is used.
+  Call again to toggle back.
+  URL `http://xahlee.info/emacs/emacs/emacs_novel_reading_mode.html'
+  Version 2019-01-30 2021-01-16"
+    (interactive)
+    (if (eq (frame-parameter (selected-frame) 'width) 70)
+        (progn
+          (set-frame-parameter (selected-frame) 'width 106)
+          (variable-pitch-mode 0)
+          (setq line-spacing nil)
+          (setq word-wrap nil))
+      (progn
+        (set-frame-parameter (selected-frame) 'width 70)
+        (variable-pitch-mode 1)
+        (setq line-spacing 0.5)
+        (setq word-wrap t)))
+    (redraw-frame (selected-frame)))
+#+END_SRC
+*** toggle margin right
+;#+BEGIN_SRC emacs-lisp
+  (defun xah-toggle-margin-right ()
+    "Toggle the right margin between `fill-column' or window width.
+  This command is convenient when reading novel, documentation.
+  URL `http://xahlee.info/emacs/emacs/emacs_novel_reading_mode.html'
+  Version 2020-04-10"
+    (interactive)
+    (if (cdr (window-margins))
+        (set-window-margins nil 0 0)
+      (set-window-margins nil 0 (- (window-body-width) fill-column))))
+#+END_SRC
+** old helm-org
+*** setup
+;#+BEGIN_SRC emacs-lisp
+  (use-package helm-org
+    :defer t
+    :after helm)
+#+END_SRC
+*** set tags and capture
+need helm mode for this
+;#+BEGIN_SRC emacs-lisp
+  (add-to-list 'helm-completing-read-handlers-alist '(org-capture . helm-org-completing-read-tags)) ;
+  (add-to-list 'helm-completing-read-handlers-alist '(org-set-tags . helm-org-completing-read-tags))
+#+END_SRC
+** old pixel scrolling with inline images (various)
+- there's an issue with this if you insert a new link while images are already displayed
+- the toggle gets messed up
+- going to scratch and executing the two setq lines should fix it
+;#+BEGIN_SRC emacs-lisp
+  (defvar togglePixelScrollMode 1)
+  (defun org-toggle-inline-images-and-pixel-scroll-mode ()
+  (interactive)
+  (if (eql togglePixelScrollMode 1)
+    (pixel-scroll-mode 1))
+  (if (eql togglePixelScrollMode 0)
+    (pixel-scroll-mode -1))
+  (setq togglePixelScrollMode (+ togglePixelScrollMode 1))
+  (setq togglePixelScrollMode (mod togglePixelScrollMode 2))
+  (org-toggle-inline-images))
+
+  (define-key org-mode-map (kbd "C-c C-x C-v") #'org-toggle-inline-images-and-pixel-scroll-mode)
+#+END_SRC
+
+** old format latex previews
+;#+BEGIN_SRC emacs-lisp
+  (setq org-latex-listings t)
+  (add-to-list 'org-latex-packages-alist '("" "listings"))
+  (add-to-list 'org-latex-packages-alist '("" "color"))
+(setq org-format-latex-options
+      (cdr '(_ :foreground "grey" ; default auto
+               :background default
+               :scale 3.0               ; default 1.0
+               :html-foreground "Black"
+               :html-background "Transparent"
+               :html-scale 1.0
+               :matchers ("begin" "$1" "$" "$$" "\\(" "\\["))))
+#+END_SRC

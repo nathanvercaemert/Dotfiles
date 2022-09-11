@@ -1,0 +1,6 @@
+# -*- mode: org -*-
+# name: latex
+# key: latex
+# binding: <f6>
+# --
+\\($0\\)
