@@ -281,8 +281,9 @@ I used this before I realized org-goto can be configured the way I want.
   (menu-bar-mode -1)
 #+END_SRC
 
-*** hide the scrollbar
-#+BEGIN_SRC emacs-lisp
+*** COMMENT hide the 4scrollbar
+this doesn't exist anymore
+;#+BEGIN_SRC emacs-lisp
   (toggle-scroll-bar -1)
 #+END_SRC
 
@@ -1889,7 +1890,7 @@ This is an internal function used by Auto-Revert Mode."
 * org roam
 ** directory
 #+BEGIN_SRC emacs-lisp
-(setq org-roam-directory (file-truename "/home/nathanvercaemert/Zettelkasten/"))
+(setq org-roam-directory (file-truename "/home/vercaemert/Dropbox/"))
 #+END_SRC
 ** db autosync
 #+BEGIN_SRC emacs-lisp
@@ -1971,8 +1972,8 @@ This is an internal function used by Auto-Revert Mode."
 #+END_SRC
 * vterm
 #+BEGIN_SRC emacs-lisp
-(add-to-list 'load-path "~/Repositories/emacs-libvterm")
-(require 'vterm)
+  (use-package vterm
+    :ensure t)
 #+END_SRC
 ** don't prompt on kill
 #+BEGIN_SRC emacs-lisp
