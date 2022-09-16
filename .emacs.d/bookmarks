@@ -2,7 +2,27 @@
 ;;; This format is meant to be slightly human-readable;
 ;;; nevertheless, you probably don't want to edit it.
 ;;; -*- End Of Bookmark File Format Version Stamp -*-
-(("configuration.org"
+(("notes.org"
+ (filename . "~/Dropbox/20220907145517-notes.org")
+ (front-context-string . ":PROPERTIES:\n:ID")
+ (rear-context-string)
+ (position . 1))
+(".emacs"
+ (filename . "~/.emacs")
+ (front-context-string . "(org-babel-load-")
+ (rear-context-string)
+ (position . 1))
+("keymap.c"
+ (filename . "~/Documents/keyboards/qmk_firmware/keyboards/ergodox_ez/keymaps/nathanvercaemert/keymap.c")
+ (front-context-string . "#include QMK_KEY")
+ (rear-context-string)
+ (position . 1))
+("moby dick.txt"
+ (filename . "~/Documents/books/moby dick.txt")
+ (front-context-string . "“Screwed at its ")
+ (rear-context-string . "bowels’ wards.\n\n")
+ (position . 117851))
+("configuration.org"
  (filename . "~/Dotfiles/.emacs.d/configuration.org")
  (front-context-string . "* package manage")
  (rear-context-string)

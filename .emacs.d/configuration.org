@@ -312,9 +312,10 @@ Iosevka is a pleasant font that is popular for coding
   (use-package zenburn-theme
     :config
     (setq zenburn-override-colors-alist
-          '(("zenburn-bg" . "#000000")
+          '(("zenburn-bg" . "#050505")
             ("zenburn-bg-2"  . "#102020")
-            ("zenburn-bg-1"  . "#202020") ; highlight
+            ;; ("zenburn-bg-1"  . "#202020") ; highlight
+            ("zenburn-bg-1"  . "#252525") ; highlight
             ("zenburn-bg-08"  . "#252525")
             ("zenburn-bg-05"  . "#342828") ; hl line
             ("zenburn-bg+05"  . "#2D2D2D")
@@ -403,11 +404,11 @@ mostly so that I can enable pixel scrolling, but it also looks nice
     (setq highlight-indent-guides-responsive 'top)
     (setq highlight-indent-guides-auto-enabled nil)
     (setq highlight-indent-guides-delay 0.1)
-  ; :config
-  ;  (set-face-background 'highlight-indent-guides-odd-face "#102020")
-  ;  (set-face-background 'highlight-indent-guides-top-odd-face "#342828")
-  ;  (set-face-background 'highlight-indent-guides-even-face "#102020")
-  ;  (set-face-background 'highlight-indent-guides-top-even-face "#342828")
+    :config
+    (set-face-background 'highlight-indent-guides-odd-face "#102020")
+    (set-face-background 'highlight-indent-guides-top-odd-face "#342828")
+    (set-face-background 'highlight-indent-guides-even-face "#104040")
+    (set-face-background 'highlight-indent-guides-top-even-face "#342828")
     )
 #+END_SRC
 ** ivy-posframe
@@ -1671,9 +1672,23 @@ this should be default...
       (bind-key "<f6> p" 'my-block-nav-next-indentation-level python-mode-map)
       (bind-key '"C-c C-u" 'my-block-nav-previous-indentation-level python-mode-map)
       )
+    (defun my-block-nav-c-bindings ()
+      (bind-key "C-c C-n" 'my-block-nav-next-block c-mode-base-map)
+      (bind-key "C-c C-p" 'my-block-nav-previous-block c-mode-base-map)
+      (bind-key "<f6> p" 'my-block-nav-next-indentation-level c-mode-base-map)
+      (bind-key '"C-c C-u" 'my-block-nav-previous-indentation-level c-mode-base-map)
+      )
+    (defun my-block-nav-c++-bindings ()
+      (bind-key "C-c C-n" 'my-block-nav-next-block c++-mode-map)
+      (bind-key "C-c C-p" 'my-block-nav-previous-block c++-mode-map)
+      (bind-key "<f6> p" 'my-block-nav-next-indentation-level c++-mode-map)
+      (bind-key '"C-c C-u" 'my-block-nav-previous-indentation-level c++-mode-map)
+      )
     :hook
     (prog-mode . my-block-nav-prog-bindings)
     (python-mode . my-block-nav-python-bindings)
+    (c-mode . my-block-nav-c-bindings)
+    (c++-mode . my-block-nav-c++-bindings)
     )
   (use-package spatial-navigate
     :straight (:package "spatial-navigate" :host nil :type git :repo "https://gitlab.com/ideasman42/emacs-spatial-navigate")
@@ -1686,9 +1701,19 @@ this should be default...
       (bind-key "C-c C-f" 'spatial-navigate-forward-vertical-bar python-mode-map)
       (bind-key "C-c C-b" 'spatial-navigate-backward-vertical-bar python-mode-map)
       )
+    (defun my-spatial-navigate-c-bindings ()
+      (bind-key "C-c C-f" 'spatial-navigate-forward-vertical-bar c-mode-base-map)
+      (bind-key "C-c C-b" 'spatial-navigate-backward-vertical-bar c-mode-base-map)
+      )
+    (defun my-spatial-navigate-c++-bindings ()
+      (bind-key "C-c C-f" 'spatial-navigate-forward-vertical-bar c++-mode-map)
+      (bind-key "C-c C-b" 'spatial-navigate-backward-vertical-bar c++-mode-map)
+      )
     :hook
     (python-mode . my-spatial-navigate-python-bindings)
     (prog-mode . my-spatial-navigate-prog-bindings)
+    (c-mode . my-spatial-navigate-c-bindings)
+    (c++-mode . my-spatial-navigate-c++-bindings)
     )
 
 #+END_SRC
