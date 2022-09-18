@@ -2,7 +2,17 @@
 ;;; This format is meant to be slightly human-readable;
 ;;; nevertheless, you probably don't want to edit it.
 ;;; -*- End Of Bookmark File Format Version Stamp -*-
-(("notes.org"
+(("boot.ahk"
+ (filename . "~/Documents/etc/ahk/boot.ahk")
+ (front-context-string . "#NoEnv  ; Recomm")
+ (rear-context-string)
+ (position . 1))
+("scratch.org"
+ (filename . "~/Documents/scratch.org")
+ (front-context-string . "* things to take")
+ (rear-context-string)
+ (position . 1))
+("notes.org"
  (filename . "~/Dropbox/20220907145517-notes.org")
  (front-context-string . ":PROPERTIES:\n:ID")
  (rear-context-string)
@@ -19,9 +29,9 @@
  (position . 1))
 ("moby dick.txt"
  (filename . "~/Documents/books/moby dick.txt")
- (front-context-string . "“Screwed at its ")
- (rear-context-string . "bowels’ wards.\n\n")
- (position . 117851))
+ (front-context-string . "CHAPTER 10. A Bo")
+ (rear-context-string . "in the place.\n\n\n")
+ (position . 128831))
 ("configuration.org"
  (filename . "~/Dotfiles/.emacs.d/configuration.org")
  (front-context-string . "* package manage")

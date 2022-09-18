@@ -260,6 +260,10 @@ I used this before I realized org-goto can be configured the way I want.
   (with-eval-after-load 'org
     (setq org-fontify-done-headline nil))
 #+END_SRC
+** agenda
+#+BEGIN_SRC emacs-lisp
+(setq org-agenda-files '("~/Dropbox"))
+#+END_SRC
 * appearances
 ** diminish
 #+BEGIN_SRC emacs-lisp
@@ -423,7 +427,7 @@ mostly so that I can enable pixel scrolling, but it also looks nice
 #+END_SRC
 ** visual line mode (word wrapping)
 #+BEGIN_SRC emacs-lisp
-(add-hook 'text-mode-hook (lambda () (visual-line-mode)))
+(add-hook 'text-mode-hook #'visual-line-mode)
 #+END_SRC
 ** default to not truncating lines in minibuffer
 #+BEGIN_SRC emacs-lisp
@@ -494,102 +498,13 @@ defined at startup because it's used in all modes
 different than the built-in in that it deletes the newline before the killed line instead of after
 - also I think you have to click built-in twice
 #+BEGIN_SRC emacs-lisp
-  ;; (defun my-kill-whole-line (append)
-  ;;   (interactive)
-  ;;   (setq tog-sh-tr-wh nil)
-  ;;   (setq line (line-number-at-pos))
-  ;;   (setq tot-lines-pre-kill (count-lines (point-min) (point-max)))
-  ;;   (if (< 1 line)
-  ;;       (progn
-  ;;         (previous-line)
-  ;;         (move-end-of-line nil))
-  ;;     (progn
-  ;;       (move-beginning-of-line nil)
-  ;;       (with-temp-buffer
-  ;;         (insert "\n")
-  ;;         (kill-region (point-min) (point-max))))
-  ;;     )
-  ;;   (kill-line)
-  ;;   (unless (or
-  ;;            (and
-  ;;             (< (count-lines (point-min) (point-max)) tot-lines-pre-kill)
-  ;;             (bobp)
-  ;;             ;; (looking-at "\n")
-  ;;             )
-  ;;            (and (not (bobp))(eolp))
-  ;;            (eobp))
-  ;;     (progn
-  ;;       (if (not show-trailing-whitespace)
-  ;;           (progn
-  ;;             (setq show-trailing-whitespace t)
-  ;;             (setq tog-sh-tr-wh t)))
-  ;;       (if (and (bobp) (eolp))
-  ;;           (delete-char 1)
-  ;;         (progn
-  ;;           (append-next-kill)
-  ;;           (kill-line)
-  ;;           ))
-  ;;       (if tog-sh-tr-wh
-  ;;           (setq show-trailing-whitespace nil))))
-  ;;   )
-
-  ;; (defun my-delete-all-lines-in-region ()
-  ;;   (interactive)
-  ;;   (setq swap-p-m nil)
-  ;;   (setq beg (line-beginning-position))
-  ;;   (setq end (line-end-position))
-  ;;   (setq num-lines 1)
-  ;;   (if mark-active
-  ;;       (progn
-  ;;         (setq trunc-swap nil)
-  ;;         (if (not truncate-lines)
-  ;;             (progn
-  ;;               (toggle-truncate-lines)
-  ;;               (setq trunc-swap t)))
-  ;;         (if (> (point) (mark))
-  ;;             (progn
-  ;;               (setq swap-p-m t)
-  ;;               (exchange-point-and-mark)))
-  ;;         (setq beg (line-beginning-position))
-  ;;         (if mark-active
-  ;;             (exchange-point-and-mark))
-  ;;         (setq end (line-end-position))
-  ;;         (unless swap-p-m
-  ;;           (exchange-point-and-mark))
-  ;;         (setq num-lines (count-lines beg end))
-
-  ;;         (if (< (point) (mark))
-  ;;             (exchange-point-and-mark))
-  ;;         (if (and (bolp) (or (eobp) (eolp)))
-  ;;             (setq num-lines (1+ num-lines)))
-  ;;         (dotimes (i num-lines)
-  ;;           (if (> i 0)
-  ;;               (my-kill-whole-line t)
-  ;;             (my-kill-whole-line nil)))
-  ;;         (if trunc-swap
-  ;;             (toggle-truncate-lines))
-  ;;         )
-  ;;     (my-kill-whole-line nil)
-  ;;     )
-  ;;   )
-
-  ;; (defun my-kill-or-copy-all-lines-in-region ()
-  ;;   (interactive)
-  ;;   (my-delete-all-lines-in-region)
-  ;;   (with-temp-buffer
-  ;;     (insert (car kill-ring))
-  ;;     (beginning-of-buffer)
-  ;;     (if (looking-at "\n")
-  ;;         (delete-char 1))
-  ;;     (reverse-region (point-min) (point-max))
-  ;;     (kill-new "\n" t)
-  ;;     (kill-region (point-min) (point-max))))
-
   (defun my-kill-or-copy-all-lines-in-region (kill)
     (interactive)
-    (let (tr-wh-is-swap trunc-is-swap end (origin (point)))
+    (let (vis-ln-md-is-swap tr-wh-is-swap trunc-is-swap end (origin (point)))
       (if (not truncate-lines)
           (progn
+            (if visual-line-mode
+                (setq vis-ln-md-is-swap t))
             (toggle-truncate-lines)
             (setq trunc-is-swap t)))
       (if (not show-trailing-whitespace)
@@ -616,7 +531,10 @@ different than the built-in in that it deletes the newline before the killed lin
       (if tr-wh-is-swap
           (setq show-trailing-whitespace nil))
       (if trunc-is-swap
-          (toggle-truncate-lines))))
+          (progn
+            (toggle-truncate-lines)
+            (if vis-ln-md-is-swap
+                (visual-line-mode))))))
 
   (defun my-kill-all-lines-in-region ()
     (interactive)
@@ -1998,7 +1916,21 @@ This is an internal function used by Auto-Revert Mode."
 * vterm
 #+BEGIN_SRC emacs-lisp
   (use-package vterm
-    :ensure t)
+    :ensure t
+    :config
+    (defun my-vterm-forward-word ()
+      (interactive)
+      (setq unread-command-events(listify-key-sequence (kbd "C-<right>"))))
+    (define-key vterm-mode-map (kbd "M-f") #'my-vterm-forward-word)
+    (defun my-vterm-backward-word ()
+      (interactive)
+      (setq unread-command-events(listify-key-sequence (kbd "C-<left>"))))
+    (define-key vterm-mode-map (kbd "M-b") #'my-vterm-backward-word)
+    (defun my-vterm-delete ()
+      (interactive)
+      (setq unread-command-events(listify-key-sequence (kbd "<delete>"))))
+    (define-key vterm-mode-map (kbd "<deletechar>") #'my-vterm-delete)
+    )
 #+END_SRC
 ** don't prompt on kill
 #+BEGIN_SRC emacs-lisp
