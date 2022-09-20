@@ -155,3 +155,6 @@ source ~/Repositories/System/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # make autocompletion suggestions legible in terminal mode
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=5'
+
+# add user local bin to path
+PATH="HOME/.local/bin:$PATH"
