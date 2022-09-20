@@ -41,18 +41,18 @@
 #+END_SRC
 ** straight setup
 #+BEGIN_SRC emacs-lisp
-(defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-      (bootstrap-version 5))
-  (unless (file-exists-p bootstrap-file)
-    (with-current-buffer
-        (url-retrieve-synchronously
-         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
-         'silent 'inhibit-cookies)
-      (goto-char (point-max))
-      (eval-print-last-sexp)))
-  (load bootstrap-file nil 'nomessage))
+  (defvar bootstrap-version)
+  (let ((bootstrap-file
+	 (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+	(bootstrap-version 5))
+    (unless (file-exists-p bootstrap-file)
+      (with-current-buffer
+	  (url-retrieve-synchronously
+	   "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+	   'silent 'inhibit-cookies)
+	(goto-char (point-max))
+	(eval-print-last-sexp)))
+    (load bootstrap-file nil 'nomessage))
 #+END_SRC
 * system settings
 ** utf8 default
@@ -117,7 +117,10 @@ note: only works for GUI Emacs (and wasn't working at all the last time I tried)
 * org
 ** Import
 #+BEGIN_SRC emacs-lisp
-  (require 'org)
+  (use-package org
+    :demand t
+    :straight (:type built-in))
+  ;  (require 'org)
 #+END_SRC
 ** latex
 #+BEGIN_SRC emacs-lisp
@@ -263,6 +266,23 @@ I used this before I realized org-goto can be configured the way I want.
 ** agenda
 #+BEGIN_SRC emacs-lisp
 (setq org-agenda-files '("~/Dropbox"))
+#+END_SRC
+*** custom commands
+#+BEGIN_SRC emacs-lisp
+  (setq org-agenda-custom-commands
+        '(("t" "test-custom-command"
+           (
+            (tags "+test+PRIORITY=\"A\"")
+            )
+           )))
+#+END_SRC
+** org-ql
+#+BEGIN_SRC emacs-lisp
+  (use-package org-ql
+    :straight (org-ql :type git :host github :repo "alphapapa/org-ql"
+                      :fork (:host github :repo "maxchaos/org-ql")
+                      :branch "tag-hierarchy-support")
+    )
 #+END_SRC
 * appearances
 ** diminish

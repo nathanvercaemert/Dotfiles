@@ -145,13 +145,13 @@ vterm_cmd() {
 # fi
 
 # dircolors
-source ~/Repositories/LS_COLORS/lscolors.sh
+source ~/Repositories/System/LS_COLORS/lscolors.sh
 
 # syntax highlighting
-source /home/nathanvercaemert/Repositories/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source ~/Repositories/System/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # autocompletion
-source ~/Repositories/zsh-autosuggestions/zsh-autosuggestions.zsh
+source ~/Repositories/System/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # make autocompletion suggestions legible in terminal mode
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=5'
