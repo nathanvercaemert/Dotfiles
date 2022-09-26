@@ -29,9 +29,9 @@
  (position . 1))
 ("moby dick.txt"
  (filename . "~/Documents/books/moby dick.txt")
- (front-context-string . "CHAPTER 13. Whee")
- (rear-context-string . "ere sleeping.\n\n\n")
- (position . 146387))
+ (front-context-string . "CHAPTER 19. The ")
+ (rear-context-string . " been wasted.\n\n\n")
+ (position . 217944))
 ("configuration.org"
  (filename . "~/Dotfiles/.emacs.d/configuration.org")
  (front-context-string . "* package manage")

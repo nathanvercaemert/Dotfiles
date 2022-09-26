@@ -157,4 +157,7 @@ source ~/Repositories/System/zsh-autosuggestions/zsh-autosuggestions.zsh
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=5'
 
 # add user local bin to path
-PATH="HOME/.local/bin:$PATH"
+PATH="$HOME/.local/bin:$PATH"
+
+# python alias
+alias python='python3'

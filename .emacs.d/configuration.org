@@ -100,7 +100,7 @@
 #+BEGIN_SRC emacs-lisp
 (require 'bind-key)
 #+END_SRC
-*** unbind insert key
+*** unbind insert key (avoid overwrite mode)
 this avoids accidentally entering overwrite mode
 #+BEGIN_SRC emacs-lisp
   (define-key global-map [(insert)] nil)
@@ -113,6 +113,19 @@ note: only works for GUI Emacs (and wasn't working at all the last time I tried)
     :defer t
     :pin melpa
     :commands esup)
+#+END_SRC
+** interaction log
+#+BEGIN_SRC emacs-lisp
+  (require 'interaction-log)
+  (interaction-log-mode +1)
+  (global-set-key
+   (kbd "C-h C-l")
+   (lambda () (interactive) (display-buffer ilog-buffer-name)))
+#+END_SRC
+** safe local variables
+this takes care of an annoying (and outdated?) prompt
+#+BEGIN_SRC emacs-lisp
+(setq enable-local-variables :safe)
 #+END_SRC
 * org
 ** Import
@@ -283,6 +296,19 @@ I used this before I realized org-goto can be configured the way I want.
                       :fork (:host github :repo "maxchaos/org-ql")
                       :branch "tag-hierarchy-support")
     )
+#+END_SRC
+** TAB exits isearch and org-cycles
+#+BEGIN_SRC emacs-lisp
+  (defun my-isearch-org-cycle ()
+    (interactive)
+    (isearch-exit)
+    (org-cycle)
+    )
+  (bind-key "TAB" 'my-isearch-org-cycle isearch-mode-map)
+#+END_SRC
+** C-TAB collapses heading
+#+BEGIN_SRC emacs-lisp
+  (bind-key "C-<tab>" 'outline-hide-subtree org-mode-map)
 #+END_SRC
 * appearances
 ** diminish
@@ -994,6 +1020,10 @@ this needs to be run before requiring multiple cursors
   (bind-key* "<f6> o" 'mc/unmark-previous-like-this)
   (bind-key* "<mouse-8>" 'mc/add-cursor-on-click) ;; qmk btn4 reads as 8
 #+END_SRC
+*** phi-search
+#+BEGIN_SRC emacs-lisp
+  (require 'phi-search)
+#+END_SRC
 ** expand region
 #+BEGIN_SRC emacs-lisp
   (use-package expand-region
@@ -1074,8 +1104,24 @@ this needs to be run before requiring multiple cursors
   (global-unset-key (kbd "C-<delete>"))
   (bind-key* "M-<delete>" 'kill-word)
 #+END_SRC
+** yasnippet
+*** setup
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'load-path "~/.emacs.d/elpa/yasnippet-0.14.0")
+  (require 'yasnippet)
+  (yas-global-mode 1)
+#+END_SRC
+*** expand snippets custom binding
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f6> s" 'yas-expand)
+  (bind-key* "ESC ESC <f5>" 'yas-expand)
+#+END_SRC
+*** remove tab binding
+#+BEGIN_SRC emacs-lisp 
+  (define-key yas-minor-mode-map [(tab)] nil)
+  (define-key yas-minor-mode-map (kbd "TAB") nil)
+#+END_SRC
 * completion
-
 ** ivy
 #+BEGIN_SRC emacs-lisp
   (use-package ivy
@@ -1145,22 +1191,26 @@ a lot of this is dealing with some performance issues associated with ivy rich
     :hook
     (prog-mode . company-mode)
     (text-mode . company-mode)
+    (ahk-mode . company-mode)
     :bind
     (:map company-active-map
           ("<tab>" . company-complete-common))
     :custom
     (company-require-match nil)
     (company-idle-delay 0)
-    (company-echo-delay 0) ; performance issue?
     (company-dabbrev-code-time-limit nil) ; performance issue?
     :config
-    (defun my-company-prog-hook ()
+    ;; these nice hooks replace the backends list buffer-locally
+    ;; the list is updated by lsp (automatically) where appropriate
+    ;; (at least when I call lsp manually, may have to change if I start lsp automatically)
+    (defun my-company-prog-hook () ; only dabbrev and files backends are accessible from prog mode
       (setq-local company-backends '((company-dabbrev-code company-files))))
     (add-hook 'prog-mode-hook #'my-company-prog-hook)
-    (defun my-company-text-hook ()
+    (defun my-company-text-hook () ; only files backend is accessible from text mode
       (setq-local company-backends '((company-files))))
     (add-hook 'text-mode-hook #'my-company-text-hook)
     )
+
 #+END_SRC
 *** company with lsp (old)
 ;#+BEGIN_SRC emacs-lisp
@@ -1209,7 +1259,6 @@ a lot of this is dealing with some performance issues associated with ivy rich
     (bind-key* "M-/" 'hippie-completing-read)
     )
 #+END_SRC
-
 
 ** old helm
 I think this needs to be above org
@@ -1314,23 +1363,6 @@ Version 2019-11-04 2021-02-16"
         (mapc
          (lambda ($fpath) (let ((process-connection-type nil))
                             (start-process "" nil "xdg-open" $fpath))) $file-list))))))
-#+END_SRC
-* yasnippet
-** setup
-#+BEGIN_SRC emacs-lisp
-  (add-to-list 'load-path "~/.emacs.d/elpa/yasnippet-0.14.0")
-  (require 'yasnippet)
-  (yas-global-mode 1)
-#+END_SRC
-** expand snippets custom binding
-#+BEGIN_SRC emacs-lisp
-  (bind-key* "<f6> s" 'yas-expand)
-  (bind-key* "ESC ESC <f5>" 'yas-expand)
-#+END_SRC
-** remove tab binding
-#+BEGIN_SRC emacs-lisp 
-  (define-key yas-minor-mode-map [(tab)] nil)
-  (define-key yas-minor-mode-map (kbd "TAB") nil)
 #+END_SRC
 * syntax
 ** sentences have one space after period
@@ -1486,13 +1518,14 @@ this should be default...
     :config
     (setq avy-timeout-seconds 100
           )
+    (setq avy-keys (number-sequence ?a ?z))
     :custom-face
     (avy-goto-char-timer-face ((t (:background "white" :foreground "black" :weight bold :underline "red" :weight bold))))
-    ;; :config
-    ;;  ;; this makes matches closer to point have shorter avy-sequences
-    ;; (setq avy-orders-alist
-    ;;       '((avy-goto-char . avy-order-closest)
-    ;;         (avy-goto-word-0 . avy-order-closest)))
+    (avy-lead-face ((t (:background "white" :foreground "#8B0000"))))
+    (avy-lead-face-0 ((t (:background "white" :foreground "#8B0000"))))
+    (avy-lead-face-1 ((t (:background "white" :foreground "#8B0000"))))
+    (avy-lead-face-2 ((t (:background "white" :foreground "#8B0000"))))
+    (avy-background-face ((t (:background "white" :foreground "#8B0000"))))
     )
   (bind-key* "<f5> 1" 'avy-goto-char-timer)
 #+END_SRC
@@ -1731,6 +1764,13 @@ I think this forces the "only window" functionality. I've had some issues with t
     (setq ignore-window-parameters temp)
     )
   (bind-key* "<f5> m" 'my-delete-other-windows)
+#+END_SRC
+** new frame (didn't work)
+;#+BEGIN_SRC emacs-lisp
+  (defun my-new-frame ()
+    (interactive)
+    (shell-command "~/Utilities/powershell_symlink alacritty --config-file C:\\Users\\nverc\\AppData\\Roaming\\alacritty\\alacritty.yml -e wsl -d Ubuntu --user vercaemert emacsclient -nw"))
+  (bind-key* "C-x 5 2" 'my-new-frame)
 #+END_SRC
 * bookmarks
 ** only list the names of bookmarks
@@ -2099,18 +2139,6 @@ this hides dot files (and hides the message saying they're being hidden)
 - add ls script for: alias ls="ls -lhaG --color=always | sed -re 's/^[^ ]* //'"
 - this issue shows how to mess with dired directory program
   - https://github.com/d12frosted/homebrew-emacs-plus/issues/383
-* phi-search
-#+BEGIN_SRC emacs-lisp
-  (require 'phi-search)
-#+END_SRC
-* interaction log
-#+BEGIN_SRC emacs-lisp
-  (require 'interaction-log)
-  (interaction-log-mode +1)
-  (global-set-key
-   (kbd "C-h C-l")
-   (lambda () (interactive) (display-buffer ilog-buffer-name)))
-#+END_SRC
 * flyspell
 ** basic emacswiki setup
 #+BEGIN_SRC emacs-lisp
@@ -2193,6 +2221,29 @@ C-q 'undo-tree-visualizer-abort
     )
 #+END_SRC
 * programming
+** c/c++ dev
+#+BEGIN_SRC emacs-lisp
+  (use-package ggtags
+    :config
+    (add-hook 'c-mode-common-hook
+              (lambda ()
+                (when (derived-mode-p 'c-mode 'c++-mode)
+                  (ggtags-mode 1))))
+    )
+#+END_SRC
+** lsp-mode
+#+BEGIN_SRC emacs-lisp
+  (use-package lsp-mode
+    :commands (lsp lsp-deferred))
+  (use-package lsp-ui
+    :commands lsp-ui-mode
+    :config
+    (setq lsp-headerline-breadcrumb-enable nil)
+    (define-key lsp-ui-mode-map [remap xref-find-definitions] #'lsp-ui-peek-find-definitions)
+    (define-key lsp-ui-mode-map [remap xref-find-references] #'lsp-ui-peek-find-references)
+    )
+  (use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
+#+END_SRC
 ** color identifiers mode
 #+BEGIN_SRC emacs-lisp
   (use-package color-identifiers-mode
@@ -2230,7 +2281,7 @@ from jweigly
 (unless (package-installed-p 'clojure-mode)
   (package-install 'clojure-mode))
 #+END_SRC
-** python Dev
+** python dev
 don't forget I might need some kind of flycheck
 *** org mode python
 #+BEGIN_SRC emacs-lisp
@@ -2247,28 +2298,15 @@ don't forget I might need some kind of flycheck
 (add-hook 'python-mode-hook
         (lambda () (setq forward-sexp-function nil)))
 #+END_SRC
-*** old pyvenv
-You can use (add-dir-local-variable) to set pyvenv-workon for a particular project.
-;#+BEGIN_SRC emacs-lisp
-(use-package pyvenv
-  :demand t
-  :config
-  (setq pyvenv-workon "emacs")  ; Default venv
-  (pyvenv-tracking-mode 1))  ; Automatically use pyvenv-workon via dir-locals
+*** jedi language server
+#+BEGIN_SRC emacs-lisp
+  (use-package lsp-jedi
+    :ensure t
+    :config
+    (with-eval-after-load "lsp-mode"
+      (add-to-list 'lsp-disabled-clients 'pyls)
+      (add-to-list 'lsp-enabled-clients 'jedi)))
 #+END_SRC
-*** old python mode
-;#+BEGIN_SRC emacs-lisp
-  (use-package python-mode
-    :defer t
-    :custom
-    ;; NOTE: Set these if Python 3 is called "python3" on your system!
-    (python-shell-interpreter "python3")
-    (dap-python-executable "python3")
-    (dap-python-debugger 'debugpy)
-    :hook
-    (python-mode . lsp))
-#+END_SRC
-
 ** rust
 #+BEGIN_SRC emacs-lisp
   (use-package rustic
@@ -2938,4 +2976,44 @@ need helm mode for this
                :html-background "Transparent"
                :html-scale 1.0
                :matchers ("begin" "$1" "$" "$$" "\\(" "\\["))))
+#+END_SRC
+ 
+** old pyvenv
+You can use (add-dir-local-variable) to set pyvenv-workon for a particular project.
+;#+BEGIN_SRC emacs-lisp
+(use-package pyvenv
+  :demand t
+  :config
+  (setq pyvenv-workon "emacs")  ; Default venv
+  (pyvenv-tracking-mode 1))  ; Automatically use pyvenv-workon via dir-locals
+#+END_SRC
+** old python mode
+;#+BEGIN_SRC emacs-lisp
+  (use-package python-mode
+    :defer t
+    :custom
+    ;; NOTE: Set these if Python 3 is called "python3" on your system!
+    (python-shell-interpreter "python3")
+    (dap-python-executable "python3")
+    (dap-python-debugger 'debugpy)
+    :hook
+    (python-mode . lsp))
+#+END_SRC
+** old lsp-python-ms
+;#+BEGIN_SRC emacs-lisp
+  (use-package lsp-python-ms
+    :ensure t
+    :init
+    (setq lsp-python-ms-executable "~/python-language-server/output/bin/Release/linux-x64/publish/Microsoft.Python.LanguageServer")
+    :hook (python-mode . (lambda ()
+                           (require 'lsp-python-ms)
+                           (lsp-deferred))))
+#+END_SRC
+** old lsp-pyright
+;#+BEGIN_SRC emacs-lisp
+(use-package lsp-pyright
+  :ensure t
+  :hook (python-mode . (lambda ()
+                          (require 'lsp-pyright)
+                          (lsp-deferred))))
 #+END_SRC

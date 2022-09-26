@@ -32,8 +32,11 @@
         mark-whole-buffer
         mouse-save-then-kill
         mouse-set-region
+        my-block-nav-previous-indentation-level
+        my-mark-symbol
         my-mark-word
         my-split-window-horizontal
+        org-cycle
         org-edit-src-save
         org-end-of-line
         org-return
@@ -49,6 +52,7 @@
 
 (setq mc/cmds-to-run-once
       '(
+        counsel-M-x
         lsp-find-definition-mouse
         make-frame-command
         vterm
