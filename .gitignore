@@ -1,9 +1,10 @@
 /*
-!/.emacs
 !/.emacs.d
 !/.zshrc
 !/.gitignore
+!/.gitignore_global
 !/Utilities
+!/.emacs
 /.emacs.d/*
 !/.emacs.d/configuration.org
 !/.emacs.d/bookmarks
