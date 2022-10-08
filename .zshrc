@@ -161,3 +161,6 @@ PATH="$HOME/.local/bin:$PATH"
 
 # python alias
 alias python='python3'
+
+# sudo alias so that sudo works with aliases
+alias sudo='sudo '

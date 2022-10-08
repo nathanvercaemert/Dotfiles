@@ -1,3 +1,9 @@
+# source code tagging
+TAGS
+GTAGS
+GRTAGS
+GPATH
+
 # -*- mode: gitignore; -*-
 *~
 \#*\#

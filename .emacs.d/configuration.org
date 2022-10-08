@@ -127,13 +127,59 @@ this takes care of an annoying (and outdated?) prompt
 #+BEGIN_SRC emacs-lisp
 (setq enable-local-variables :safe)
 #+END_SRC
+** clipboard access in terminal mode (-nw)
+- probably need to check what system is being used and act accordingly
+  - that is to say: only do this if alacritty wsl
+#+BEGIN_SRC emacs-lisp
+  (use-package clipetty
+    :demand t
+    :ensure t
+    :hook (after-init . global-clipetty-mode))
+#+END_SRC
 * org
+** tag tree and amalgamation
+#+BEGIN_SRC emacs-lisp
+  (defun tag-amalgamation-helper ()
+    (setq headline-tags (org-get-tags))
+    (setq amalgamation "")
+    (if headline-tags
+        (setq amalgamation (format "%s" headline-tags)))
+    (org-set-property "Tag-Amalgamation" amalgamation))
+
+  ;; (defun tag-amalgamation-helper ()
+  ;;   (setq headline-tags (org-entry-get nil "ALLTAGS"))
+  ;;   (setq amalgamation "")
+  ;;   (if headline-tags
+  ;;       (setq amalgamation (format "%s" headline-tags)))
+  ;;   (org-set-property "Tag-Amalgamation" amalgamation))
+
+  (defun tag-amalgamation ()
+    (org-map-entries #'tag-amalgamation-helper))
+
+  (defun create-id-for-all-helper ()
+    (setq current-id (org-entry-get nil "ID"))
+    (unless current-id
+      (org-id-get-create)))
+
+  (defun create-id-for-all ()
+    (org-map-entries #'create-id-for-all-helper))
+
+  (defun notes-save-hook ()
+    (when (and (stringp buffer-file-name)
+               (string-match "notes.org" buffer-file-name))
+      (progn
+        (add-hook 'after-save-hook 'tag-amalgamation nil t)
+        (add-hook 'after-save-hook 'create-id-for-all nil t)
+        )))
+
+#+END_SRC
 ** Import
 #+BEGIN_SRC emacs-lisp
   (use-package org
     :demand t
-    :straight (:type built-in))
-  ;  (require 'org)
+    :straight (:type built-in)
+    :hook
+    (org-mode . notes-save-hook))
 #+END_SRC
 ** latex
 #+BEGIN_SRC emacs-lisp
@@ -219,6 +265,23 @@ this needs to be below [[*navigate to end of subtree][navigate to end of subtree
      )
     )
   (bind-key "C-M-<return>" 'new-subheading-respect-content org-mode-map)
+#+END_SRC
+*** navigate to beginning of text be it a heading or a list item
+#+BEGIN_SRC emacs-lisp
+  (defun my-org-back-to-indentation ()
+    (interactive)
+    (setq current-line (org-current-line-string))
+    (setq is-heading (string-match "^\*+\s.*" current-line))
+    (setq is-list-item (string-match "^\s?-\s.*" current-line))
+    (if (or is-heading is-list-item)
+        (progn
+          (beginning-of-line)
+          (forward-word)
+          (backward-word))
+      (back-to-indentation))
+    )
+
+  (bind-key "M-m" 'my-org-back-to-indentation org-mode-map)
 #+END_SRC
 ** make sure regular links still go to chrome
 #+BEGIN_SRC emacs-lisp
@@ -310,6 +373,18 @@ I used this before I realized org-goto can be configured the way I want.
 #+BEGIN_SRC emacs-lisp
   (bind-key "C-<tab>" 'outline-hide-subtree org-mode-map)
 #+END_SRC
+** rifle
+#+BEGIN_SRC emacs-lisp
+  (use-package helm-org-rifle)
+#+END_SRC
+** TODO S-RET for pressing enter on collapsed PROPERTIES
+- do I really need this?
+- want to respect the collapsed content but press enter to start a new line
+- when :PROPERTIES: is collapsed and I want to start typing after it
+- org-table-p may be neccessary
+  - I think it determines whether or not you're in a table
+  - https://emacs.stackexchange.com/questions/34992/elisp-how-to-tell-if-my-cursor-is-inside-an-org-table
+- should work by going to the line below (if there is one), going to end, then pressing enter
 * appearances
 ** diminish
 #+BEGIN_SRC emacs-lisp
@@ -359,24 +434,50 @@ this doesn't exist anymore
 Iosevka is a pleasant font that is popular for coding
 ** theme (zenburn)
 #+BEGIN_SRC emacs-lisp
+  ;; (use-package zenburn-theme
+  ;;   :config
+  ;;   (setq zenburn-override-colors-alist
+  ;;         '(("zenburn-bg" . "#050505")
+  ;;           ("zenburn-bg-2"  . "#102020")
+  ;;           ("zenburn-bg-1"  . "#252525") ; selected text (highlight)
+  ;;           ("zenburn-bg-08"  . "#252525")
+  ;;           ("zenburn-bg-05"  . "#342828") ; hl line (highlight)
+  ;;           ("zenburn-bg+05"  . "#2D2D2D")
+  ;;           ("zenburn-bg+1"  . "#303030")
+  ;;           ("zenburn-bg+2"  . "#323232")
+  ;;           ("zenburn-bg+3"  . "#353535")
+  ;;           ("zenburn-fg-1"     . "#555555")
+  ;;           ("zenburn-fg-05"    . "#888888")
+  ;;           ("zenburn-fg"     . "#DDDDDD")
+  ;;           ("zenburn-fg+1"     . "#EEEEEE")
+  ;;           ("zenburn-fg+2"     . "#FFFFFF")
+  ;;           ("zenburn-green+2" . "#8FB28F") ; org-level-6 (now same as green+1)
+  ;;           ("zenburn-red+2" . "#FFC0CB") ; org-level-7
+  ;;           ))
+  ;;   (load-theme 'zenburn t)
+  ;;   (set-face-background 'mode-line-inactive "#202020")
+  ;;   (set-face-background 'mode-line "#2D2D2D")
+  ;;   )
   (use-package zenburn-theme
     :config
     (setq zenburn-override-colors-alist
-          '(("zenburn-bg" . "#050505")
+          '(("zenburn-bg" . "#050505") ; has to be 050505 instead of 000000 for some reason
             ("zenburn-bg-2"  . "#102020")
-            ;; ("zenburn-bg-1"  . "#202020") ; highlight
-            ("zenburn-bg-1"  . "#252525") ; highlight
+            ("zenburn-bg-1"  . "#252525") ; selected text (highlight)
             ("zenburn-bg-08"  . "#252525")
-            ("zenburn-bg-05"  . "#342828") ; hl line
+            ("zenburn-bg-05"  . "#342828") ; hl line (highlight)
             ("zenburn-bg+05"  . "#2D2D2D")
             ("zenburn-bg+1"  . "#303030")
-            ("zenburn-bg+2"  . "#323232")
-            ("zenburn-bg+3"  . "#353535")
-            ("zenburn-fg-1"     . "#555555")
-            ("zenburn-fg-05"    . "#888888")
-            ("zenburn-fg"     . "#DDDDDD")
+            ("zenburn-bg+2"  . "#303030")
+            ("zenburn-bg+3"  . "#6F6F6F")
+            ("zenburn-fg-1"     . "#AAAAAA")
+            ("zenburn-fg-05"    . "#AAAAAA")
+            ("zenburn-fg"     . "#DCDCCC")
             ("zenburn-fg+1"     . "#EEEEEE")
-            ("zenburn-fg+2"     . "#FFFFFF")))
+            ("zenburn-fg+2"     . "#FFFFFF")
+            ("zenburn-green+2" . "#8FB28F") ; org-level-6 (now same as green+1)
+            ("zenburn-red+2" . "#FFC0CB") ; org-level-7
+            ))
     (load-theme 'zenburn t)
     (set-face-background 'mode-line-inactive "#202020")
     (set-face-background 'mode-line "#2D2D2D")
@@ -479,6 +580,11 @@ mostly so that I can enable pixel scrolling, but it also looks nice
 #+BEGIN_SRC emacs-lisp
 (add-hook 'minibuffer-setup-hook
       (lambda () (setq truncate-lines nil)))
+#+END_SRC
+** rainbow mode
+nice elpa package that overlays hex color values with their actual color
+#+BEGIN_SRC emacs-lisp
+  (use-package rainbow-mode)
 #+END_SRC
 * text editing
 ** duplicate line or region
@@ -1099,6 +1205,9 @@ this needs to be run before requiring multiple cursors
 #+END_SRC
 *** TODO note that I fixed the exchange-point and mark issue
 ** TODO forward/backward kill/delete word
+<<unset C-backspace>>
+- this may need to come before [[replacement of overwrite of isearch-abort][replacement of overwrite of isearch-abort]]
+  - not sure if global-unset-key would erase my binding ^^^
 #+BEGIN_SRC emacs-lisp
   (global-unset-key (kbd "C-<backspace>"))
   (global-unset-key (kbd "C-<delete>"))
@@ -1120,6 +1229,10 @@ this needs to be run before requiring multiple cursors
 #+BEGIN_SRC emacs-lisp 
   (define-key yas-minor-mode-map [(tab)] nil)
   (define-key yas-minor-mode-map (kbd "TAB") nil)
+#+END_SRC
+** spelling command shorten
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "M-4" 'ispell-word)
 #+END_SRC
 * completion
 ** ivy
@@ -1711,6 +1824,23 @@ which is the new location originally moved from: https://gitlab.com/iankelling/v
   (require 'visible-mark)
   (global-visible-mark-mode 1)
 #+END_SRC
+** isearch-exit on ESC
+[[replacement of overwrite of isearch-abort][replacement of overwrite of isearch-abort]]
+- this is my <<overwrite of isearch-abort>>
+- I expect isearch to quit on ESC regardless of whether or not there is a match
+  - this is assuming ESC has been changed to C-g with ahk
+#+BEGIN_SRC emacs-lisp
+  (bind-key "C-g" 'isearch-cancel isearch-mode-map)
+#+END_SRC
+** isearch-abort on C-<backspace>
+[[overwrite of isearch-abort][overwrite of isearch-abort]]
+- this is my <<replacement of overwrite of isearch-abort>>
+- in this context, isearch-abort removes the typed string after matching typed string in isearch (going back to the last string that matched anything)
+- this may need to come after [[unset C-backspace][unset C-backspace]]
+  - not sure if global-unset-key would erase my binding ^^^
+#+BEGIN_SRC emacs-lisp
+  (bind-key "C-<backspace>" 'isearch-abort isearch-mode-map)
+#+END_SRC
 * window/buffer functions
 ** split window
 #+BEGIN_SRC emacs-lisp
@@ -1897,11 +2027,16 @@ This is an internal function used by Auto-Revert Mode."
 #+END_SRC
 ** db autosync
 #+BEGIN_SRC emacs-lisp
-(org-roam-db-autosync-mode)
+  ;; (org-roam-db-autosync-mode) ; this doesn't seem to want to work for some reason
+  (defun my-silent-db-sync ()
+    (let ((inhibit-message t))
+      (org-roam-db-sync))
+    )
+  (run-with-idle-timer 600 t #'my-silent-db-sync) ; sync every (idle) 10 minutes silently
 #+END_SRC
 ** core bindings
-*** visit thing
-#+BEGIN_SRC emacs-lisp
+*** old visit thing
+;#+BEGIN_SRC emacs-lisp
   (define-key org-roam-mode-map [mouse-1] #'org-roam-visit-thing)
 #+END_SRC
 
@@ -1928,27 +2063,18 @@ This is an internal function used by Auto-Revert Mode."
 #+BEGIN_SRC emacs-lisp
   (bind-key* "<f9> r a" 'org-roam-alias-add)
 #+END_SRC
-
+*** sync db
+#+BEGIN_SRC emacs-lisp
+  (bind-key* "<f9> r s" 'org-roam-db-sync)
+#+END_SRC
 ** buffer
 #+BEGIN_SRC emacs-lisp
-  (defun org-roam-buffer-pop ()
-    (interactive)
-    (split-window-right)
-    (org-roam-buffer-toggle)
-    (other-window 1)
-    (make-frame-command)
-    (other-frame 2)
-    (delete-window)
-    (other-frame 1))
   (defun org-roam-buffer-reload ()
     (interactive)
-    (split-window-right)
     (org-roam-buffer-toggle)
     (org-roam-buffer-toggle)
-    ;; not necessary for notdeft
-    ;; (deft-refresh))
     )
-  (bind-key* "<f9> r b" 'org-roam-buffer-pop)
+  (bind-key* "<f9> r b" 'org-roam-buffer-toggle)
   (bind-key* "<f9> r <f9> r" 'org-roam-buffer-reload)
 #+END_SRC
 *** buffer appearance
@@ -1961,18 +2087,6 @@ This is an internal function used by Auto-Revert Mode."
                (window-height . fit-window-to-buffer)))
 #+END_SRC
 
-** old capture templates
-;#+BEGIN_SRC emacs-lisp
-  (setq org-roam-capture-templates
-        '(("d" "default" plain "%?"
-           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
-                              "#+title: ${title}\n")
-           :unnarrowed t)
-          ("D" "default" plain "%?"
-           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
-                              "#+title: ${title}\n")
-           :unnarrowed t)))
-#+END_SRC
 * vterm
 #+BEGIN_SRC emacs-lisp
   (use-package vterm
@@ -2216,8 +2330,10 @@ C-q 'undo-tree-visualizer-abort
 ** basic setup
 #+BEGIN_SRC emacs-lisp
   (use-package flycheck
+    :init (global-flycheck-mode)
     :config
-    (setq flycheck-emacs-lisp-load-path 'inherit)
+    (setq flycheck-global-modes '(not org-mode))
+    (setq-default flycheck-emacs-lisp-load-path 'inherit)
     )
 #+END_SRC
 * programming
@@ -2595,6 +2711,9 @@ this outputs ^[[1;2H which is then translated with an ASCII table to hex
 
 printf "the_output_of_sed" | od -t x1
 this converts to hex (doesn't C-things "^[")
+
+- note that I'm currently using GUI-r and then running "alacritty --config-file C:\Users\nverc\AppData\Roaming\alacritty\alacritty.yml -e wsl -d Ubuntu --user vercaemert emacsclient -nw"
+
 #+BEGIN_SRC emacs-lisp
   (straight-use-package
    '(term-keys :type git :host github :repo "CyberShadow/term-keys"
@@ -2633,6 +2752,18 @@ this converts to hex (doesn't C-things "^[")
 		  "\\|^#\\+[[:alpha:]_]+:.*$" ;; org-mode metadata
 		  "\\|^:PROPERTIES:\n\\(.+\n\\)+:END:\n"
 		  "\\)"))
+#+END_SRC
+** old capture templates
+;#+BEGIN_SRC emacs-lisp
+  (setq org-roam-capture-templates
+        '(("d" "default" plain "%?"
+           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
+                              "#+title: ${title}\n")
+           :unnarrowed t)
+          ("D" "default" plain "%?"
+           :target (file+head "${slug}-%<%Y%m%d%H%M%S>.org"
+                              "#+title: ${title}\n")
+           :unnarrowed t)))
 #+END_SRC
 ** old notdeft
 ;#+BEGIN_SRC emacs-lisp
