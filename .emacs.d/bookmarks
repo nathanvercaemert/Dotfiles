@@ -34,9 +34,9 @@
  (position . 1))
 ("moby dick.txt"
  (filename . "~/Documents/books/moby dick.txt")
- (front-context-string . "Third among the ")
- (rear-context-string . "mate’s squire.\n\n")
- (position . 272141))
+ (front-context-string . "CHAPTER 34. The ")
+ (rear-context-string . "unbodied air!\n\n\n")
+ (position . 331616))
 ("configuration.org"
  (filename . "~/Dotfiles/.emacs.d/configuration.org")
  (front-context-string . "* package manage")

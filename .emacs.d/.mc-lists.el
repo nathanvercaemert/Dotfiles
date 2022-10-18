@@ -5,6 +5,7 @@
       '(
         avy-goto-char-2
         backward-local-mark
+        backward-sexp
         c-electric-brace
         c-electric-colon
         c-electric-paren

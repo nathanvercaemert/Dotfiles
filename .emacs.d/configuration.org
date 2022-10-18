@@ -272,7 +272,7 @@ this needs to be below [[*navigate to end of subtree][navigate to end of subtree
     (interactive)
     (setq current-line (org-current-line-string))
     (setq is-heading (string-match "^\*+\s.*" current-line))
-    (setq is-list-item (string-match "^\s?-\s.*" current-line))
+    (setq is-list-item (string-match "^\s*?-\s.*" current-line))
     (if (or is-heading is-list-item)
         (progn
           (beginning-of-line)
@@ -2694,6 +2694,10 @@ would need to make sure jdee package installed
 
   ;; (setq lsp-java-workspace-dir "/home/nathanvercaemert/eclipse-workspace/jsword")
 
+#+END_SRC
+* org drill
+#+BEGIN_SRC emacs-lisp
+  (use-package org-drill)
 #+END_SRC
 * term-keys
 alacritty --config-file C:\Users\a686051\AppData\Roaming\alactritty\alacritty.yml
