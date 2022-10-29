@@ -14,6 +14,7 @@
         company-indent-or-complete-common
         dap-tooltip-mouse-motion
         default-indent-new-line
+        down-list
         drag-stuff-up
         duplicate-current-line-or-region
         duplicate-line
@@ -34,6 +35,8 @@
         mouse-save-then-kill
         mouse-set-region
         my-block-nav-previous-indentation-level
+        my-kill-all-lines-in-region
+        my-mark-outside-pairs
         my-mark-symbol
         my-mark-word
         my-split-window-horizontal

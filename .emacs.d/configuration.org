@@ -198,6 +198,7 @@ this takes care of an annoying (and outdated?) prompt
 #+BEGIN_SRC emacs-lisp
   (setq org-image-actual-width nil)
 #+END_SRC
+
 **** example syntax
 #+ATTR_ORG: :width 100
 *** folded
@@ -696,8 +697,15 @@ different than the built-in in that it deletes the newline before the killed lin
     (interactive)
     (my-kill-or-copy-all-lines-in-region nil))
 
+  (defun my-paste-line ()
+    (interactive)
+    (move-end-of-line nil)
+    (yank)
+    )
+
   (bind-key* "C-k" 'my-kill-all-lines-in-region)
-  (bind-key* "M-k" 'my-copy-all-lines-in-region)
+  (bind-key* "M-k" 'my-paste-line)
+  (bind-key* "C-M-k" 'my-copy-all-lines-in-region)
 #+END_SRC
 *** test my-delete-all-lines-in-region
 #+NAME: test-my-kill-or-copy-all-lines-in-region
@@ -1170,7 +1178,14 @@ this needs to be run before requiring multiple cursors
 #+END_SRC
 ** electric pair mode
 #+BEGIN_SRC emacs-lisp
-(electric-pair-mode)
+  (electric-pair-mode)
+
+  ;; inhibit double and single quotes (because there is a bug with double quotes in org mode)
+  ;; bug: if you type (no quotes here, just literal typing) "test", then "test"" appears
+  ;; this extra " causes problems
+  (setq electric-pair-inhibit-predicate
+        (lambda (c)
+          (if (or (char-equal c ?\') (char-equal c ?\")) t (electric-pair-default-inhibit c))))
 #+END_SRC
 ** shift by indentation
 #+BEGIN_SRC emacs-lisp
@@ -1583,6 +1598,18 @@ have the next command execute at the beginning of the match
 [[*switch to/from minibuffer][switch to/from minibuffer]]
 ** paragraph motion and shift selection
 #+BEGIN_SRC emacs-lisp
+  ;; custom functions to override org mode paragraph movement
+  ;; note that org movement still available using C-<up>/<down>
+  (defun my-forward-paragraph ()
+    (interactive)
+    (forward-paragraph)
+    )
+
+  (defun my-backward-paragraph ()
+    (interactive)
+    (backward-paragraph)
+    )
+
   (defun backward-paragraph-with-shift-select ()
     (interactive)
     (setq this-command-keys-shift-translated t)
@@ -1593,9 +1620,9 @@ have the next command execute at the beginning of the match
     (setq this-command-keys-shift-translated t)
     (call-interactively 'forward-paragraph))
 
-  (bind-key* "<f5> 3" 'forward-paragraph)
+  (bind-key* "<f5> 3" 'my-forward-paragraph)
   (bind-key* "S-<f5> #" 'forward-paragraph-with-shift-select)
-  (bind-key* "<f5> 2" 'backward-paragraph)
+  (bind-key* "<f5> 2" 'my-backward-paragraph)
   (bind-key* "S-<f5> @" 'backward-paragraph-with-shift-select)
 #+END_SRC
 
