@@ -700,7 +700,7 @@ different than the built-in in that it deletes the newline before the killed lin
   (defun my-paste-line ()
     (interactive)
     (move-end-of-line nil)
-    (yank)
+    (insert (car kill-ring-yank-pointer))
     )
 
   (bind-key* "C-k" 'my-kill-all-lines-in-region)
@@ -1641,10 +1641,12 @@ this should be default...
 
 ** disable basic arrow movement
 #+BEGIN_SRC emacs-lisp
-(global-unset-key (kbd "<left>"))
-(global-unset-key (kbd "<right>"))
-(global-unset-key (kbd "<up>"))
-(global-unset-key (kbd "<down>"))
+  (global-unset-key (kbd "<left>"))
+  (global-unset-key (kbd "<right>"))
+  ;; undoing this because having issues with docker
+  ;; going to make ahk send up for ^p (and others)
+  ;; (global-unset-key (kbd "<up>"))
+  (global-unset-key (kbd "<down>"))
 #+END_SRC
 ** TODO avy
 #+BEGIN_SRC emacs-lisp
