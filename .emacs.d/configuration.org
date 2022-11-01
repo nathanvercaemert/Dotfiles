@@ -219,6 +219,15 @@ this takes care of an annoying (and outdated?) prompt
 #+BEGIN_SRC emacs-lisp
   (bind-key "<f5> 9" 'org-previous-visible-heading org-mode-map)
 #+END_SRC
+*** org element movement (and normal paragraph movement in org)
+- undo the remapping of forward-paragraph
+- bind element movement (coincidentally to one of its pre-undo-remapping bindings)
+#+BEGIN_SRC emacs-lisp
+  (define-key org-mode-map [remap forward-paragraph] nil)
+  (define-key org-mode-map [remap backward-paragraph] nil)
+  (bind-key "C-<down>" 'org-forward-paragraph)
+  (bind-key "C-<up>" 'org-backward-paragraph)
+#+END_SRC
 ** don't prompt for code evaluation (specified languages)
 #+BEGIN_SRC emacs-lisp
 (setq org-confirm-babel-evaluate nil)
@@ -1604,17 +1613,6 @@ have the next command execute at the beginning of the match
 [[*switch to/from minibuffer][switch to/from minibuffer]]
 ** paragraph motion and shift selection
 #+BEGIN_SRC emacs-lisp
-  ;; custom functions to override org mode paragraph movement
-  ;; note that org movement still available using C-<up>/<down>
-  (defun my-forward-paragraph ()
-    (interactive)
-    (forward-paragraph)
-    )
-  (defun my-backward-paragraph ()
-    (interactive)
-    (backward-paragraph)
-    )
-
   ;; custom functions because paragraph shift selection
   ;; doesn't work the way I like out of the box
   (defun my-backward-paragraph-with-shift-select ()
@@ -1626,9 +1624,9 @@ have the next command execute at the beginning of the match
     (setq this-command-keys-shift-translated t)
     (call-interactively 'forward-paragraph))
 
-  (bind-key* "<f5> 3" 'my-forward-paragraph)
+  (bind-key* "<f5> 3" 'forward-paragraph)
   (bind-key* "S-<f5> #" 'my-forward-paragraph-with-shift-select)
-  (bind-key* "<f5> 2" 'my-backward-paragraph)
+  (bind-key* "<f5> 2" 'backward-paragraph)
   (bind-key* "S-<f5> @" 'my-backward-paragraph-with-shift-select)
 #+END_SRC
 
