@@ -213,6 +213,12 @@ this takes care of an annoying (and outdated?) prompt
 #+BEGIN_SRC emacs-lisp
 (setq org-startup-with-inline-images nil)
 #+END_SRC
+*** My binding for C-c C-p
+- this was a result of docker not processing C-p correctly
+- it is in tandem with the changes in ahk (^p -> {Up}) and allowing {Up} in my config
+#+BEGIN_SRC emacs-lisp
+  (bind-key "<f5> 9" 'org-previous-visible-heading org-mode-map)
+#+END_SRC
 ** don't prompt for code evaluation (specified languages)
 #+BEGIN_SRC emacs-lisp
 (setq org-confirm-babel-evaluate nil)
@@ -1604,26 +1610,26 @@ have the next command execute at the beginning of the match
     (interactive)
     (forward-paragraph)
     )
-
   (defun my-backward-paragraph ()
     (interactive)
     (backward-paragraph)
     )
 
-  (defun backward-paragraph-with-shift-select ()
+  ;; custom functions because paragraph shift selection
+  ;; doesn't work the way I like out of the box
+  (defun my-backward-paragraph-with-shift-select ()
     (interactive)
     (setq this-command-keys-shift-translated t)
     (call-interactively 'backward-paragraph))
-
-  (defun forward-paragraph-with-shift-select ()
+  (defun my-forward-paragraph-with-shift-select ()
     (interactive)
     (setq this-command-keys-shift-translated t)
     (call-interactively 'forward-paragraph))
 
   (bind-key* "<f5> 3" 'my-forward-paragraph)
-  (bind-key* "S-<f5> #" 'forward-paragraph-with-shift-select)
+  (bind-key* "S-<f5> #" 'my-forward-paragraph-with-shift-select)
   (bind-key* "<f5> 2" 'my-backward-paragraph)
-  (bind-key* "S-<f5> @" 'backward-paragraph-with-shift-select)
+  (bind-key* "S-<f5> @" 'my-backward-paragraph-with-shift-select)
 #+END_SRC
 
 *** paragraph C-M-a C-M-e
