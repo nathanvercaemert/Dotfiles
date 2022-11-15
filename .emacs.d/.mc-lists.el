@@ -20,6 +20,7 @@
         duplicate-line
         electric-newline-and-maybe-indent
         electric-pair-delete-pair
+        end-of-defun
         forward-sexp
         handle-select-window
         handle-switch-frame
@@ -30,6 +31,7 @@
         kill-region
         kill-region
         kmacro-start-macro-or-insert-counter
+        lsp-signature-stop
         lsp-ui-doc--handle-mouse-movement
         mark-whole-buffer
         mouse-save-then-kill
@@ -43,6 +45,7 @@
         org-cycle
         org-edit-src-save
         org-end-of-line
+        org-export-dispatch
         org-return
         org-return-indent
         org-self-insert-command

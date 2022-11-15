@@ -220,8 +220,9 @@ this takes care of an annoying (and outdated?) prompt
   (bind-key "<f5> 9" 'org-previous-visible-heading org-mode-map)
 #+END_SRC
 *** org element movement (and normal paragraph movement in org)
-- undo the remapping of forward-paragraph
+- undo org's remapping of forward-paragraph
 - bind element movement (coincidentally to one of its pre-undo-remapping bindings)
+- this allows for both types of paragraph movement in org mode
 #+BEGIN_SRC emacs-lisp
   (define-key org-mode-map [remap forward-paragraph] nil)
   (define-key org-mode-map [remap backward-paragraph] nil)
@@ -450,30 +451,6 @@ this doesn't exist anymore
 Iosevka is a pleasant font that is popular for coding
 ** theme (zenburn)
 #+BEGIN_SRC emacs-lisp
-  ;; (use-package zenburn-theme
-  ;;   :config
-  ;;   (setq zenburn-override-colors-alist
-  ;;         '(("zenburn-bg" . "#050505")
-  ;;           ("zenburn-bg-2"  . "#102020")
-  ;;           ("zenburn-bg-1"  . "#252525") ; selected text (highlight)
-  ;;           ("zenburn-bg-08"  . "#252525")
-  ;;           ("zenburn-bg-05"  . "#342828") ; hl line (highlight)
-  ;;           ("zenburn-bg+05"  . "#2D2D2D")
-  ;;           ("zenburn-bg+1"  . "#303030")
-  ;;           ("zenburn-bg+2"  . "#323232")
-  ;;           ("zenburn-bg+3"  . "#353535")
-  ;;           ("zenburn-fg-1"     . "#555555")
-  ;;           ("zenburn-fg-05"    . "#888888")
-  ;;           ("zenburn-fg"     . "#DDDDDD")
-  ;;           ("zenburn-fg+1"     . "#EEEEEE")
-  ;;           ("zenburn-fg+2"     . "#FFFFFF")
-  ;;           ("zenburn-green+2" . "#8FB28F") ; org-level-6 (now same as green+1)
-  ;;           ("zenburn-red+2" . "#FFC0CB") ; org-level-7
-  ;;           ))
-  ;;   (load-theme 'zenburn t)
-  ;;   (set-face-background 'mode-line-inactive "#202020")
-  ;;   (set-face-background 'mode-line "#2D2D2D")
-  ;;   )
   (use-package zenburn-theme
     :config
     (setq zenburn-override-colors-alist
@@ -493,6 +470,8 @@ Iosevka is a pleasant font that is popular for coding
             ("zenburn-fg+2"     . "#FFFFFF")
             ("zenburn-green+2" . "#8FB28F") ; org-level-6 (now same as green+1)
             ("zenburn-red+2" . "#FFC0CB") ; org-level-7
+            ("zenburn-orange" . "#FFA500") ; org-level-1
+            ("zenburn-magenta" . "#FF00FF") ; org-level-8
             ))
     (load-theme 'zenburn t)
     (set-face-background 'mode-line-inactive "#202020")
