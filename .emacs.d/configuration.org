@@ -470,7 +470,7 @@ Iosevka is a pleasant font that is popular for coding
             ("zenburn-fg+2"     . "#FFFFFF")
             ("zenburn-green+2" . "#8FB28F") ; org-level-6 (now same as green+1)
             ("zenburn-red+2" . "#FFC0CB") ; org-level-7
-            ("zenburn-orange" . "#FFA500") ; org-level-1
+            ("zenburn-yellow-2" . "#FFA500") ; org-level-4
             ("zenburn-magenta" . "#FF00FF") ; org-level-8
             ))
     (load-theme 'zenburn t)
